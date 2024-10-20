@@ -1,145 +1,247 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm, FormProvider, Controller } from "react-hook-form"
+import * as z from "zod"
 import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command"
-import { Check, ChevronsUpDown } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useToast } from "@/components/ui/use-toast"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 
-const initialGroceryItems = [
-  { id: 1, name: "Apples", price: 2.99, unit: "lb", lastPurchased: "2023-04-10", store: "Whole Foods" },
-  { id: 2, name: "Milk", price: 3.50, unit: "gallon", lastPurchased: "2023-04-12", store: "Safeway" },
-  { id: 3, name: "Bread", price: 2.50, unit: "loaf", lastPurchased: "2023-04-15", store: "Trader Joe's" },
-  { id: 4, name: "Eggs", price: 3.99, unit: "dozen", lastPurchased: "2023-04-11", store: "Costco" },
-  { id: 5, name: "Chicken", price: 5.99, unit: "lb", lastPurchased: "2023-04-13", store: "Whole Foods" },
-]
+const formSchema = z.object({
+  date: z.string(),
+  name: z.string().min(2, "Name must be at least 2 characters."),
+  price: z.number().positive("Price must be positive."),
+  store: z.string().min(2, "Store name must be at least 2 characters."),
+  additionalDetails: z.string().optional(),
+  quantity: z.number().positive("Quantity must be positive."),
+  subCategory: z.enum(["Vegies", "Non-veg", "Dairy", "Fruits", "Long-Term", "Snacks"]),
+  unit: z.enum(["per kg/per lb", "each"]),
+  sellerRate: z.number().positive("Seller rate must be positive."),
+  sellerRateInLb: z.number().positive("Seller rate in lb must be positive."),
+})
 
 export function GroceryTracker() {
-  const [groceryItems, setGroceryItems] = useState(initialGroceryItems)
-  const [newItem, setNewItem] = useState({ name: "", price: "", unit: "", store: "", date: "" })
-  const [storeNames, setStoreNames] = useState(["Whole Foods", "Safeway", "Trader Joe's", "Costco"])
-  const [open, setOpen] = useState(false)
+  const { toast } = useToast()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  useEffect(() => {
-    const uniqueStores = Array.from(new Set(groceryItems.map(item => item.store)))
-    setStoreNames(uniqueStores)
-  }, [groceryItems])
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      date: new Date().toISOString().split('T')[0],
+      name: "",
+      price: 0,
+      store: "",
+      additionalDetails: "",
+      quantity: 1,
+      subCategory: "Vegies",
+      unit: "per kg/per lb",
+      sellerRate: 0,
+      sellerRateInLb: 0,
+    },
+  })
 
-  const handleAddItem = () => {
-    if (newItem.name && newItem.price && newItem.unit && newItem.store && newItem.date) {
-      setGroceryItems([
-        ...groceryItems,
-        {
-          id: groceryItems.length + 1,
-          name: newItem.name,
-          price: parseFloat(newItem.price),
-          unit: newItem.unit,
-          lastPurchased: newItem.date,
-          store: newItem.store,
+  const handleUnitChange = (value: string) => {
+    form.setValue('unit', value);
+    form.setValue('sellerRate', 0);
+    form.setValue('sellerRateInLb', 0);
+  };
+
+  const handleSellerRateChange = (value: number) => {
+    form.setValue('sellerRate', value);
+    if (form.getValues('unit') === 'per kg/per lb') {
+      form.setValue('sellerRateInLb', value / 2.20462);
+    }
+  };
+
+  const handleSellerRateInLbChange = (value: number) => {
+    form.setValue('sellerRateInLb', value);
+    if (form.getValues('unit') === 'per kg/per lb') {
+      form.setValue('sellerRate', value * 2.20462);
+    }
+  };
+
+  async function onSubmit(values: z.infer<typeof formSchema>) {
+    setIsSubmitting(true)
+    console.log("Submitting grocery item:", values)
+
+    try {
+      const response = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      ])
-      if (!storeNames.includes(newItem.store)) {
-        setStoreNames([...storeNames, newItem.store])
+        body: JSON.stringify({ values: [{ ...values, isGrocery: true }] }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to add grocery item')
       }
-      setNewItem({ name: "", price: "", unit: "", store: "", date: "" })
+
+      const result = await response.json()
+      console.log("Server response:", result)
+
+      toast({
+        title: "Grocery item added successfully",
+        description: `Your new grocery item has been recorded with ID: ${result.id}`,
+        variant: "default",
+      })
+
+      form.reset()
+    } catch (error) {
+      console.error("Error submitting grocery item:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   return (
-    <Card>
+    <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Grocery Tracker</CardTitle>
-        <CardDescription>Track your grocery items and their prices</CardDescription>
+        <CardTitle>Add Grocery Item</CardTitle>
+        <CardDescription>Enter details for a new grocery item</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex space-x-2 mb-4">
-          <Input
-            placeholder="Item name"
-            value={newItem.name}
-            onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-          />
-          <Input
-            type="number"
-            placeholder="Price"
-            value={newItem.price}
-            onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-          />
-          <Input
-            placeholder="Unit"
-            value={newItem.unit}
-            onChange={(e) => setNewItem({ ...newItem, unit: e.target.value })}
-          />
-          <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={open}
-                className="w-[200px] justify-between"
-              >
-                {newItem.store || "Select store..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[200px] p-0">
-              <Command>
-                <CommandInput placeholder="Search store..." />
-                <CommandEmpty>No store found.</CommandEmpty>
-                <CommandGroup>
-                  {storeNames.map((store) => (
-                    <CommandItem
-                      key={store}
-                      onSelect={(currentValue) => {
-                        setNewItem({ ...newItem, store: currentValue === newItem.store ? "" : currentValue })
-                        setOpen(false)
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          newItem.store === store ? "opacity-100" : "opacity-0"
-                        )}
+        <FormProvider {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="date">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  {...form.register('date')}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  {...form.register('name')}
+                  placeholder="Enter item name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price">Price ($)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  {...form.register('price', { valueAsNumber: true })}
+                  placeholder="0.00"
+                  step="0.01"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="quantity">Quantity</Label>
+                <Input
+                  id="quantity"
+                  type="number"
+                  {...form.register('quantity', { valueAsNumber: true })}
+                  placeholder="Enter quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="subCategory">Sub-Category</Label>
+                <Select onValueChange={(value) => form.setValue('subCategory', value as any)} defaultValue={form.getValues('subCategory')}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select sub-category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Vegies">Vegies</SelectItem>
+                    <SelectItem value="Non-veg">Non-veg</SelectItem>
+                    <SelectItem value="Dairy">Dairy</SelectItem>
+                    <SelectItem value="Fruits">Fruits</SelectItem>
+                    <SelectItem value="Long-Term">Long-Term</SelectItem>
+                    <SelectItem value="Snacks">Snacks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="store">Store</Label>
+                <Input
+                  id="store"
+                  {...form.register('store')}
+                  placeholder="Enter store name"
+                />
+              </div>
+            </div>
+            
+            {/* Group Unit and Seller Rate fields */}
+            <Card className="p-4 bg-gray-50 dark:bg-gray-800">
+              <h3 className="text-lg font-semibold mb-2">Pricing Details</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="unit">Unit</Label>
+                  <Controller
+                    name="unit"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Select onValueChange={handleUnitChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select unit" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="per kg/per lb">per kg/per lb</SelectItem>
+                          <SelectItem value="each">each</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sellerRate">Seller Rate (per kg)</Label>
+                  <Controller
+                    name="sellerRate"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => handleSellerRateChange(parseFloat(e.target.value))}
                       />
-                      {store}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          <Input
-            type="date"
-            value={newItem.date}
-            onChange={(e) => setNewItem({ ...newItem, date: e.target.value })}
-          />
-          <Button onClick={handleAddItem}>Add Item</Button>
-        </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Item</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Store</TableHead>
-              <TableHead>Last Purchased</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {groceryItems.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>${item.price.toFixed(2)}</TableCell>
-                <TableCell>{item.unit}</TableCell>
-                <TableCell>{item.store}</TableCell>
-                <TableCell>{item.lastPurchased}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+                    )}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sellerRateInLb">Seller Rate (per lb)</Label>
+                  <Controller
+                    name="sellerRateInLb"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => handleSellerRateInLbChange(parseFloat(e.target.value))}
+                      />
+                    )}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            <div className="space-y-2">
+              <Label htmlFor="additionalDetails">Additional Details (Optional)</Label>
+              <Textarea
+                id="additionalDetails"
+                {...form.register('additionalDetails')}
+                placeholder="Enter additional details"
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Submitting..." : "Add Grocery Item"}
+            </Button>
+          </form>
+        </FormProvider>
       </CardContent>
     </Card>
   )

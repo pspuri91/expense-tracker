@@ -1,90 +1,166 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Edit2, Check, X } from "lucide-react"
+import { motion } from "framer-motion"
 
-const initialBudgetCategories = [
-  { name: "Grocery", budget: 500, spent: 350 },
-  { name: "Clothing", budget: 200, spent: 150 },
-  { name: "Transport", budget: 300, spent: 280 },
-  { name: "Utilities", budget: 400, spent: 380 },
-  { name: "Miscellaneous", budget: 200, spent: 100 },
-]
+type BudgetCategory = {
+  category: string;
+  total: number;
+  budget: number;
+};
 
 export function BudgetOverview() {
-  const [budgetCategories, setBudgetCategories] = useState(initialBudgetCategories)
-  const [totalBudget, setTotalBudget] = useState(
-    initialBudgetCategories.reduce((sum, category) => sum + category.budget, 0)
-  )
+  const [budgetData, setBudgetData] = useState<BudgetCategory[]>([]);
+  const [totalExpenses, setTotalExpenses] = useState(0);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [editedBudget, setEditedBudget] = useState<number>(0);
 
-  const totalSpent = budgetCategories.reduce((sum, category) => sum + category.spent, 0)
-  const overallProgress = (totalSpent / totalBudget) * 100
+  useEffect(() => {
+    fetchBudgetData();
+  }, []);
 
-  const handleBudgetChange = (index, newBudget) => {
-    const updatedCategories = [...budgetCategories]
-    updatedCategories[index].budget = Number(newBudget)
-    setBudgetCategories(updatedCategories)
-    setTotalBudget(updatedCategories.reduce((sum, category) => sum + category.budget, 0))
+  async function fetchBudgetData() {
+    try {
+      const response = await fetch('/api/budget');
+      if (!response.ok) {
+        throw new Error('Failed to fetch budget data');
+      }
+      const data = await response.json();
+      console.log('Fetched budget data:', data);
+      setBudgetData(data.budgetData);
+      setTotalExpenses(data.totalExpenses || 0);
+    } catch (error) {
+      console.error('Error fetching budget data:', error);
+      setBudgetData([]);
+      setTotalExpenses(0);
+    }
   }
 
-  const handleTotalBudgetChange = (newTotalBudget) => {
-    const factor = newTotalBudget / totalBudget
-    const updatedCategories = budgetCategories.map(category => ({
-      ...category,
-      budget: Math.round(category.budget * factor)
-    }))
-    setBudgetCategories(updatedCategories)
-    setTotalBudget(Number(newTotalBudget))
-  }
+  const handleEdit = (category: string, budget: number) => {
+    setEditingCategory(category);
+    setEditedBudget(budget);
+  };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Budget Overview</CardTitle>
-        <CardDescription>Track your spending against your budget</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-8">
-          <div>
-            <Label htmlFor="totalBudget">Total Budget</Label>
-            <div className="flex items-center space-x-2">
-              <Input
-                id="totalBudget"
-                type="number"
-                value={totalBudget}
-                onChange={(e) => handleTotalBudgetChange(e.target.value)}
-              />
-              <Button onClick={() => handleTotalBudgetChange(totalBudget)}>Update</Button>
-            </div>
-            <Progress value={overallProgress} className="h-2 mt-2" />
-            <p className="text-sm text-muted-foreground mt-2">
-              ${totalSpent.toFixed(2)} / ${totalBudget.toFixed(2)}
-            </p>
-          </div>
-          {budgetCategories.map((category, index) => (
-            <div key={category.name}>
-              <Label htmlFor={`budget-${category.name}`}>{category.name}</Label>
-              <div className="flex items-center space-x-2">
-                <Input
-                  id={`budget-${category.name}`}
-                  type="number"
-                  value={category.budget}
-                  onChange={(e) => handleBudgetChange(index, e.target.value)}
-                />
-                <Button onClick={() => handleBudgetChange(index, category.budget)}>Update</Button>
-              </div>
-              <Progress value={(category.spent / category.budget) * 100} className="h-2 mt-2" />
-              <p className="text-sm text-muted-foreground mt-2">
-                ${category.spent.toFixed(2)} / ${category.budget.toFixed(2)}
+  const handleSave = async () => {
+    try {
+      const response = await fetch('/api/budget', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ category: editingCategory, budget: editedBudget }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update budget');
+      }
+
+      await fetchBudgetData();
+      setEditingCategory(null);
+    } catch (error) {
+      console.error('Error updating budget:', error);
+    }
+  };
+
+  const getColorForPercentage = (percentage: number) => {
+    if (percentage < 50) return "from-emerald-500/20 to-emerald-500/40";
+    if (percentage < 75) return "from-amber-500/20 to-amber-500/40";
+    if (percentage < 100) return "from-orange-500/20 to-orange-500/40";
+    return "from-red-500/20 to-red-500/40";
+  };
+
+  const getTextColorForPercentage = (percentage: number) => {
+    if (percentage < 50) return "text-emerald-700 dark:text-emerald-300";
+    if (percentage < 75) return "text-amber-700 dark:text-amber-300";
+    if (percentage < 100) return "text-orange-700 dark:text-orange-300";
+    return "text-red-700 dark:text-red-300";
+  };
+
+  const getGradientForPercentage = (percentage: number) => {
+    if (percentage < 50) return "bg-gradient-to-r from-emerald-500/20 to-emerald-500/40";
+    if (percentage < 75) return "bg-gradient-to-r from-amber-500/20 to-amber-500/40";
+    if (percentage < 100) return "bg-gradient-to-r from-orange-500/20 to-orange-500/40";
+    return "bg-gradient-to-r from-red-500/20 to-red-500/40";
+  };
+
+  const renderBudgetCategory = (category: BudgetCategory) => {
+    const percentage = (category.total / category.budget) * 100;
+    const gradientClass = getGradientForPercentage(percentage);
+    const textColorClass = getTextColorForPercentage(percentage);
+
+    return (
+      <motion.div
+        key={category.category}
+        className="mb-2 rounded-lg p-2 relative overflow-hidden"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div 
+          className={`absolute inset-0 ${gradientClass}`} 
+          style={{ width: `${Math.min(percentage, 100)}%` }}
+        />
+        <div className="relative z-10">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-white">{category.category}</h3>
+              <p className={`text-xs ${textColorClass}`}>
+                ${category.total.toFixed(2)} / ${category.budget.toFixed(2)}
               </p>
             </div>
-          ))}
+            <div className="flex flex-col items-end">
+              <Button 
+                onClick={() => handleEdit(category.category, category.budget)} 
+                size="sm" 
+                className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 rounded-full mb-1"
+              >
+                <Edit2 className="h-3 w-3 text-white" />
+              </Button>
+              <p className={`text-sm font-bold ${textColorClass}`}>{percentage.toFixed(0)}%</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+            {percentage >= 100
+              ? `$${(category.total - category.budget).toFixed(2)} over`
+              : `$${(category.budget - category.total).toFixed(2)} left`}
+          </p>
         </div>
-      </CardContent>
-    </Card>
+        {editingCategory === category.category && (
+          <div className="absolute inset-0 bg-gray-800 bg-opacity-90 flex items-center justify-center z-20">
+            <div className="flex items-center">
+              <Input
+                type="number"
+                value={editedBudget}
+                onChange={(e) => setEditedBudget(Number(e.target.value))}
+                className="w-20 h-8 text-xs mr-2 bg-white dark:bg-gray-700"
+              />
+              <Button onClick={handleSave} size="sm" className="h-8 px-2 mr-1 bg-green-500 hover:bg-green-600"><Check className="h-3 w-3" /></Button>
+              <Button onClick={() => setEditingCategory(null)} size="sm" className="h-8 px-2" variant="outline"><X className="h-3 w-3" /></Button>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  const totalCategory = budgetData.find(category => category.category === 'Total');
+  const sortedCategories = budgetData
+    .filter(category => category.category !== 'Total')
+    .sort((a, b) => (b.total / b.budget) - (a.total / a.budget));
+
+  return (
+    <div className="space-y-2 bg-gray-100 dark:bg-gray-900 rounded-xl p-4">
+      {totalCategory && (
+        <div className="mb-4">
+          {renderBudgetCategory(totalCategory)}
+        </div>
+      )}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+        {sortedCategories.map(renderBudgetCategory)}
+      </div>
+    </div>
   )
 }

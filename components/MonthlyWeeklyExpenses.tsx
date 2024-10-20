@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 const categories = ["Grocery", "Clothing", "Transport", "Utilities", "Miscellaneous"]
 const colors = ["#8884d8", "#82ca9d", "#ffc658", "#ff8042", "#a4de6c"]
 
-const generateData = (period) => {
+const generateData = (period: 'monthly' | 'weekly') => { // Explicitly type period
   return Array.from({ length: period === 'monthly' ? 6 : 4 }, (_, i) => ({
     name: period === 'monthly' ? `Month ${i + 1}` : `Week ${i + 1}`,
     ...Object.fromEntries(categories.map(category => [
@@ -20,7 +20,12 @@ const generateData = (period) => {
     total: 0
   })).map(item => ({
     ...item,
-    total: Object.values(item).reduce((sum, val) => typeof val === 'number' ? sum + val : sum, 0) - item.name.length
+    total: Object.values(item).reduce((sum: number, val) => {
+      if (typeof val === 'number') {
+        return sum + val; // Add if val is a number
+      }
+      return sum; // Skip non-number values
+    }, 0) // Initialize sum to 0
   }))
 }
 
@@ -31,7 +36,7 @@ export function MonthlyWeeklyExpenses() {
   const [activeTab, setActiveTab] = useState("monthly")
   const [selectedCategories, setSelectedCategories] = useState(categories)
 
-  const handleCategoryToggle = (category) => {
+  const handleCategoryToggle = (category: string) => { // Explicitly type category as string
     setSelectedCategories(prev =>
       prev.includes(category)
         ? prev.filter(c => c !== category)
@@ -41,8 +46,8 @@ export function MonthlyWeeklyExpenses() {
 
   const filteredData = (activeTab === "monthly" ? monthlyData : weeklyData).map(item => ({
     name: item.name,
-    ...Object.fromEntries(selectedCategories.map(category => [category, item[category]])),
-    total: selectedCategories.reduce((sum, category) => sum + item[category], 0)
+    ...Object.fromEntries(selectedCategories.map(category => [category, item[category as keyof typeof item] as number])), // Cast to number
+    total: selectedCategories.reduce((sum, category) => sum + (item[category as keyof typeof item] as number || 0), 0) // Cast to number
   }))
 
   return (
