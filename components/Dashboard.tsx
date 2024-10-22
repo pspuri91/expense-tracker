@@ -7,7 +7,6 @@ import { ExpenseForm } from "@/components/ExpenseForm"
 import { BudgetOverview } from "@/components/BudgetOverview"
 import { GroceryTracker } from "@/components/GroceryTracker"
 import { MonthlyExpenseTable } from "@/components/MonthlyExpenseTable"
-import { RecentExpenses } from "@/components/RecentExpenses"
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -25,9 +24,8 @@ export default function Dashboard() {
           <TabsTrigger value="grocery" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white px-3 py-2">Grocery</TabsTrigger>
           <TabsTrigger value="monthly" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white px-3 py-2">Monthly</TabsTrigger>
         </TabsList>
-        <TabsContent value="overview" className="space-y-4">
+        <TabsContent value="overview">
           <Overview />
-          <RecentExpenses />
         </TabsContent>
         <TabsContent value="expenses">
           <ExpenseForm />

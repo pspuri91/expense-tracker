@@ -31,7 +31,7 @@ export async function GET(request: Request) {
         expectedDuration: row[8] ? parseInt(row[8]) : null,
         durationUnit: row[9],
         isGrocery: row[10] === 'Yes',
-        unit: row[11] || null,  // Include Unit for regular expenses
+        unit: row[11] || null,
       })),
       ...groceryData.slice(1).map(row => ({
         id: row[0],
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         durationUnit: row[8],
         quantity: row[9] ? parseFloat(row[9]) : null,
         subCategory: row[10],
-        unit: row[11] || null,  // Include Unit for grocery items
+        unit: row[11] || null,
         sellerRate: row[12] ? parseFloat(row[12]) : null,
         sellerRateInLb: row[13] ? parseFloat(row[13]) : null,
         isGrocery: true,
@@ -56,8 +56,12 @@ export async function GET(request: Request) {
     if (month && year) {
       const filteredData = allExpenses.filter(expense => {
         const date = new Date(expense.date);
-        // Use getUTCMonth() and getUTCFullYear() to avoid timezone issues
-        return date.getUTCMonth() === parseInt(month) - 1 && date.getUTCFullYear() === parseInt(year);
+        // Use UTC to avoid timezone issues
+        const expenseMonth = date.getUTCMonth();
+        const expenseYear = date.getUTCFullYear();
+
+        // Ensure the month and year match correctly
+        return expenseMonth === parseInt(month) - 1 && expenseYear === parseInt(year);
       });
       return NextResponse.json(filteredData);
     }

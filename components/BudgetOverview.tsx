@@ -12,7 +12,12 @@ type BudgetCategory = {
   budget: number;
 };
 
-export function BudgetOverview() {
+interface BudgetOverviewProps {
+  selectedMonth: number;
+  selectedYear: number;
+}
+
+export function BudgetOverview({ selectedMonth, selectedYear }: BudgetOverviewProps) {
   const [budgetData, setBudgetData] = useState<BudgetCategory[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
@@ -20,11 +25,11 @@ export function BudgetOverview() {
 
   useEffect(() => {
     fetchBudgetData();
-  }, []);
+  }, [selectedMonth, selectedYear]);
 
   async function fetchBudgetData() {
     try {
-      const response = await fetch('/api/budget');
+      const response = await fetch(`/api/budget?month=${selectedMonth}&year=${selectedYear}`);
       if (!response.ok) {
         throw new Error('Failed to fetch budget data');
       }

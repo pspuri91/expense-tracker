@@ -21,13 +21,11 @@ export async function GET(request: Request) {
 
     const filteredExpenses = expenseData.slice(1).filter((row: any[]) => {
       const date = new Date(row[1]);
-      // Use getUTCMonth() and getUTCFullYear() to avoid timezone issues
       return date.getUTCMonth() + 1 === month && date.getUTCFullYear() === year;
     });
 
     const filteredGroceries = groceryData.slice(1).filter((row: any[]) => {
       const date = new Date(row[1]);
-      // Use getUTCMonth() and getUTCFullYear() to avoid timezone issues
       return date.getUTCMonth() + 1 === month && date.getUTCFullYear() === year;
     });
 
@@ -53,7 +51,6 @@ export async function GET(request: Request) {
     if (totalCategory) {
       totalCategory.total = totalExpenses;
     } else {
-      // If 'Total' category doesn't exist, add it
       budgetData.push({ category: 'Total', total: totalExpenses, budget: budgetData.reduce((sum, item) => sum + item.budget, 0) });
     }
 
