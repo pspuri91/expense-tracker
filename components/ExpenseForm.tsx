@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm, FormProvider } from "react-hook-form"
+import { useForm, FormProvider, Controller } from "react-hook-form"
 import * as z from "zod"
 import { Button } from "@/components/ui/button"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Autocomplete } from "@/components/ui/autocomplete"
 
 interface ExpenseFormProps {
   onSuccess?: () => void;
@@ -36,6 +37,8 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
+  const [storeOptions, setStoreOptions] = useState<string[]>([])
+  const [nameOptions, setNameOptions] = useState<string[]>([])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -82,6 +85,40 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
       });
     }
   }, [mode, editData, form]);
+
+  useEffect(() => {
+    async function fetchStoreNames() {
+      try {
+        const response = await fetch('/api/stores');
+        if (!response.ok) {
+          throw new Error('Failed to fetch store names');
+        }
+        const data = await response.json();
+        setStoreOptions(data);
+      } catch (error) {
+        console.error('Error fetching store names:', error);
+      }
+    }
+
+    fetchStoreNames();
+  }, []);
+
+  useEffect(() => {
+    async function fetchNames() {
+      try {
+        const response = await fetch('/api/names');
+        if (!response.ok) {
+          throw new Error('Failed to fetch names');
+        }
+        const data = await response.json();
+        setNameOptions(data);
+      } catch (error) {
+        console.error('Error fetching names:', error);
+      }
+    }
+
+    fetchNames();
+  }, []);
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
@@ -179,7 +216,11 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                   <FormItem>
                     <FormLabel>Name</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Autocomplete
+                        {...field}
+                        options={nameOptions}
+                        placeholder="Select or enter a name"
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -203,7 +244,11 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                   <FormItem>
                     <FormLabel>Store/Service Provider (Optional)</FormLabel>
                     <FormControl>
-                      <Input {...field} />
+                      <Autocomplete
+                        {...field}
+                        options={storeOptions}
+                        placeholder="Select or enter a store"
+                      />
                     </FormControl>
                   </FormItem>
                 )}

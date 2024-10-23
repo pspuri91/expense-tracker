@@ -10,6 +10,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react"
 import { ExpenseModal } from "./ExpenseModal"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { useToast } from "@/components/ui/use-toast"
+import { ExpenseHistoryModal } from "./ExpenseHistoryModal"
 
 type Expense = {
   id: string;
@@ -40,6 +41,8 @@ export function MonthlyExpenseTable() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [selectedExpenseName, setSelectedExpenseName] = useState<string | null>(null);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const { toast } = useToast()
 
   useEffect(() => {
@@ -148,8 +151,125 @@ export function MonthlyExpenseTable() {
     return { groceries: sortedGroceries, otherExpenses: sortedOtherExpenses };
   };
 
-  // Update the table content section
+  // Add this function to render mobile-friendly expense card
+  const renderExpenseCard = (expense: Expense) => (
+    <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-4">
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <h3 
+            className="font-semibold hover:text-blue-500 cursor-pointer"
+            onClick={() => handleNameClick(expense.name)}
+          >
+            {expense.name}
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{expense.date}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-bold">${(expense.price || 0).toFixed(2)}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{expense.store}</p>
+        </div>
+      </div>
+      
+      {expense.isGrocery ? (
+        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+          <div>
+            <span className="text-gray-500 dark:text-gray-400">Sub-category:</span>
+            <p>{expense.subCategory}</p>
+          </div>
+          <div>
+            <span className="text-gray-500 dark:text-gray-400">Quantity:</span>
+            <p>{expense.quantity} {expense.unit}</p>
+          </div>
+          {expense.sellerRate && (
+            <>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Rate (kg):</span>
+                <p>${expense.sellerRate}</p>
+              </div>
+              <div>
+                <span className="text-gray-500 dark:text-gray-400">Rate (lb):</span>
+                <p>${expense.sellerRateInLb}</p>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="mb-2">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Category:</span>
+          <p className="text-sm">{expense.category}</p>
+        </div>
+      )}
+
+      {expense.isLongTermBuy && (
+        <div className="text-sm mb-2">
+          <span className="text-gray-500 dark:text-gray-400">Duration:</span>
+          <p>{expense.expectedDuration} {expense.durationUnit}</p>
+        </div>
+      )}
+
+      {expense.additionalDetails && (
+        <div className="text-sm mb-2">
+          <span className="text-gray-500 dark:text-gray-400">Details:</span>
+          <p>{expense.additionalDetails}</p>
+        </div>
+      )}
+
+      <div className="flex justify-end space-x-2 mt-2">
+        <Button onClick={() => handleEdit(expense)} size="sm">
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button 
+          onClick={() => handleDelete(expense)}
+          variant="destructive"
+          size="sm"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Update the renderTableContent function
   const renderTableContent = () => {
+    if (expenses.length === 0) {
+      return (
+        <div className="text-center p-4">
+          No expenses found for this month and year.
+        </div>
+      );
+    }
+
+    const { groceries, otherExpenses } = getSortedAndGroupedExpenses();
+
+    // Mobile view
+    return (
+      <div className="md:hidden">
+        {groceries.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold mb-3 px-4">Grocery Expenses</h2>
+            {groceries.map((expense) => (
+              <div key={expense.id}> {/* Add key prop here */}
+                {renderExpenseCard(expense)}
+              </div>
+            ))}
+          </div>
+        )}
+        {otherExpenses.length > 0 && (
+          <div>
+            <h2 className="text-lg font-semibold mb-3 px-4">Other Expenses</h2>
+            {otherExpenses.map((expense) => (
+              <div key={expense.id}> {/* Add key prop here */}
+                {renderExpenseCard(expense)}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Add this function to render desktop table content
+  const renderDesktopTableContent = () => {
     if (expenses.length === 0) {
       return (
         <TableRow>
@@ -178,7 +298,14 @@ export function MonthlyExpenseTable() {
             {groceries.map((expense) => (
               <TableRow key={expense.id}>
                 <TableCell>{expense.date}</TableCell>
-                <TableCell>{expense.name}</TableCell>
+                <TableCell>
+                  <span 
+                    className="hover:text-blue-500 cursor-pointer"
+                    onClick={() => handleNameClick(expense.name)}
+                  >
+                    {expense.name}
+                  </span>
+                </TableCell>
                 <TableCell>{expense.subCategory}</TableCell>
                 <TableCell>${(expense.price || 0).toFixed(2)}</TableCell>
                 <TableCell>{expense.store}</TableCell>
@@ -194,12 +321,13 @@ export function MonthlyExpenseTable() {
                 <TableCell>{expense.sellerRateInLb}</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button onClick={() => handleEdit(expense)}>
+                    <Button onClick={() => handleEdit(expense)} size="sm">
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button 
                       onClick={() => handleDelete(expense)}
                       variant="destructive"
+                      size="sm"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -224,7 +352,14 @@ export function MonthlyExpenseTable() {
             {otherExpenses.map((expense) => (
               <TableRow key={expense.id}>
                 <TableCell>{expense.date}</TableCell>
-                <TableCell>{expense.name}</TableCell>
+                <TableCell>
+                  <span 
+                    className="hover:text-blue-500 cursor-pointer"
+                    onClick={() => handleNameClick(expense.name)}
+                  >
+                    {expense.name}
+                  </span>
+                </TableCell>
                 <TableCell>{expense.category}</TableCell>
                 <TableCell>${(expense.price || 0).toFixed(2)}</TableCell>
                 <TableCell>{expense.store}</TableCell>
@@ -240,12 +375,13 @@ export function MonthlyExpenseTable() {
                 <TableCell>-</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button onClick={() => handleEdit(expense)}>
+                    <Button onClick={() => handleEdit(expense)} size="sm">
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button 
                       onClick={() => handleDelete(expense)}
                       variant="destructive"
+                      size="sm"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -259,35 +395,40 @@ export function MonthlyExpenseTable() {
     );
   };
 
+  const handleNameClick = (name: string) => {
+    setSelectedExpenseName(name);
+    setIsHistoryModalOpen(true);
+  };
+
   return (
-    <Card className="w-full overflow-hidden">
+    <Card className="w-full">
       <CardHeader>
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <CardTitle className="text-xl sm:text-2xl">Monthly Expenses</CardTitle>
             <CardDescription>View your expenses for a specific month and year</CardDescription>
           </div>
-          <div className="flex space-x-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button 
               onClick={() => setIsGroceryModalOpen(true)}
-              className="flex items-center space-x-2"
+              className="flex items-center justify-center"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 mr-2" />
               <span>Add Grocery</span>
             </Button>
             <Button 
               onClick={() => setIsExpenseModalOpen(true)}
-              className="flex items-center space-x-2"
+              className="flex items-center justify-center"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 mr-2" />
               <span>Add Other</span>
             </Button>
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 mt-4">
+        <div className="flex flex-col sm:flex-row gap-2 mt-4">
           <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select month" />
             </SelectTrigger>
             <SelectContent>
@@ -297,7 +438,7 @@ export function MonthlyExpenseTable() {
             </SelectContent>
           </Select>
           <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Select year" />
             </SelectTrigger>
             <SelectContent>
@@ -308,8 +449,15 @@ export function MonthlyExpenseTable() {
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
+
+      <CardContent>
+        {/* Mobile View */}
+        <div className="block md:hidden">
+          {renderTableContent()}
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden md:block overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -332,7 +480,7 @@ export function MonthlyExpenseTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {renderTableContent()}
+              {renderDesktopTableContent()}
             </TableBody>
           </Table>
         </div>
@@ -380,6 +528,16 @@ export function MonthlyExpenseTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {selectedExpenseName && (
+        <ExpenseHistoryModal
+          isOpen={isHistoryModalOpen}
+          onClose={() => {
+            setIsHistoryModalOpen(false);
+            setSelectedExpenseName(null);
+          }}
+          expenseName={selectedExpenseName}
+        />
+      )}
     </Card>
   );
 }

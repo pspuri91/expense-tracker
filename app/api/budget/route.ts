@@ -15,16 +15,16 @@ export async function GET(request: Request) {
   const year = parseInt(searchParams.get('year') || new Date().getFullYear().toString());
 
   try {
-    const expenseData = await readSpreadsheet(SPREADSHEET_ID, EXPENSE_RANGE);
-    const groceryData = await readSpreadsheet(SPREADSHEET_ID, GROCERY_RANGE);
+    const expenseData = await readSpreadsheet(SPREADSHEET_ID, EXPENSE_RANGE) || [];
+    const groceryData = await readSpreadsheet(SPREADSHEET_ID, GROCERY_RANGE) || [];
     const categoryBudgets = await readCategoryBudgets(SPREADSHEET_ID);
 
-    const filteredExpenses = expenseData.slice(1).filter((row: any[]) => {
+    const filteredExpenses = (expenseData.slice(1) || []).filter((row: any[]) => {
       const date = new Date(row[1]);
       return date.getUTCMonth() + 1 === month && date.getUTCFullYear() === year;
     });
 
-    const filteredGroceries = groceryData.slice(1).filter((row: any[]) => {
+    const filteredGroceries = (groceryData.slice(1) || []).filter((row: any[]) => {
       const date = new Date(row[1]);
       return date.getUTCMonth() + 1 === month && date.getUTCFullYear() === year;
     });

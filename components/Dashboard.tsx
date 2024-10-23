@@ -19,19 +19,11 @@ export default function Dashboard() {
       <Tabs defaultValue="budget" onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-1 flex flex-wrap justify-start">
           <TabsTrigger value="budget" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white px-3 py-2">Budget</TabsTrigger>
-          <TabsTrigger value="expenses" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white px-3 py-2">Expenses</TabsTrigger>
-          <TabsTrigger value="grocery" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white px-3 py-2">Grocery</TabsTrigger>
           <TabsTrigger value="monthly" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white px-3 py-2">Monthly</TabsTrigger>
           <TabsTrigger value="overview" className="data-[state=active]:bg-teal-500 data-[state=active]:text-white px-3 py-2">Yearly Overview</TabsTrigger>
         </TabsList>
         <TabsContent value="budget">
           <BudgetOverview />
-        </TabsContent>
-        <TabsContent value="expenses">
-          <ExpenseForm />
-        </TabsContent>
-        <TabsContent value="grocery">
-          <GroceryTracker />
         </TabsContent>
         <TabsContent value="monthly">
           <MonthlyExpenseTable />

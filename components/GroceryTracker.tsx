@@ -13,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Autocomplete } from "@/components/ui/autocomplete"; // Assume you have an Autocomplete component
 
 const formSchema = z.object({
   date: z.string(),
@@ -39,6 +40,8 @@ interface GroceryTrackerProps {
 export function GroceryTracker({ onSuccess, editData, mode = 'create' }: GroceryTrackerProps) {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [storeOptions, setStoreOptions] = useState<string[]>([])
+  const [nameOptions, setNameOptions] = useState<string[]>([])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -99,6 +102,40 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
       });
     }
   }, [mode, editData, form]);
+
+  useEffect(() => {
+    async function fetchStoreNames() {
+      try {
+        const response = await fetch('/api/stores');
+        if (!response.ok) {
+          throw new Error('Failed to fetch store names');
+        }
+        const data = await response.json();
+        setStoreOptions(data);
+      } catch (error) {
+        console.error('Error fetching store names:', error);
+      }
+    }
+
+    fetchStoreNames();
+  }, []);
+
+  useEffect(() => {
+    async function fetchNames() {
+      try {
+        const response = await fetch('/api/names');
+        if (!response.ok) {
+          throw new Error('Failed to fetch names');
+        }
+        const data = await response.json();
+        setNameOptions(data);
+      } catch (error) {
+        console.error('Error fetching names:', error);
+      }
+    }
+
+    fetchNames();
+  }, []);
 
   // Update onSubmit to handle both create and edit
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -173,10 +210,17 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
               </div>
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  {...form.register('name')}
-                  placeholder="Enter item name"
+                <Controller
+                  name="name"
+                  control={form.control}
+                  defaultValue={editData?.name || ''}
+                  render={({ field }) => (
+                    <Autocomplete
+                      {...field}
+                      options={nameOptions}
+                      placeholder="Select or enter a name"
+                    />
+                  )}
                 />
               </div>
               <div className="space-y-2">
@@ -216,10 +260,17 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
               </div>
               <div className="space-y-2">
                 <Label htmlFor="store">Store</Label>
-                <Input
-                  id="store"
-                  {...form.register('store')}
-                  placeholder="Enter store name"
+                <Controller
+                  name="store"
+                  control={form.control}
+                  defaultValue={editData?.store || ''}
+                  render={({ field }) => (
+                    <Autocomplete
+                      {...field}
+                      options={storeOptions}
+                      placeholder="Select or enter a store"
+                    />
+                  )}
                 />
               </div>
             </div>
