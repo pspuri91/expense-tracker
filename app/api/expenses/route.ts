@@ -15,11 +15,11 @@ export async function GET(request: Request) {
   const year = searchParams.get('year');
 
   try {
-    const expenseData = await readSpreadsheet(SPREADSHEET_ID, EXPENSE_RANGE);
-    const groceryData = await readSpreadsheet(SPREADSHEET_ID, GROCERY_RANGE);
+    const expenseData = await readSpreadsheet(SPREADSHEET_ID, EXPENSE_RANGE) || [];
+    const groceryData = await readSpreadsheet(SPREADSHEET_ID, GROCERY_RANGE) || [];
     
     const allExpenses = [
-      ...expenseData.slice(1).map(row => ({
+      ...(expenseData.slice(1) || []).map(row => ({
         id: row[0],
         date: row[1],
         name: row[2],
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
         isGrocery: row[10] === 'Yes',
         unit: row[11] || null,
       })),
-      ...groceryData.slice(1).map(row => ({
+      ...(groceryData.slice(1) || []).map(row => ({
         id: row[0],
         date: row[1],
         name: row[2],
@@ -115,16 +115,18 @@ export async function PUT(request: Request) {
     const range = isGrocery ? GROCERY_RANGE : EXPENSE_RANGE;
 
     // Find the row index for the given id
-    const data = await readSpreadsheet(SPREADSHEET_ID, range);
-    const rowIndex = data.findIndex((row: any[]) => row[0] === id.toString());
+    const data = await readSpreadsheet(SPREADSHEET_ID, range) || [];
+    // Update the findIndex to handle string IDs
+    const rowIndex = data.findIndex((row: any[]) => row[0] === id);
 
     if (rowIndex === -1) {
       return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
     }
 
     const rowNumber = rowIndex + 1; // +1 because sheets are 1-indexed
-    const updateRange = isGrocery ? `Groceries!A${rowNumber}:N${rowNumber}` : `Expenses!A${rowNumber}:K${rowNumber}`;
+    const updateRange = isGrocery ? `Groceries!A${rowNumber}:O${rowNumber}` : `Expenses!A${rowNumber}:K${rowNumber}`;
 
+    // Pass the existing id to formatValues to preserve it
     const formattedValues = formatValues(values, id, isGrocery);
     await updateSpreadsheetRow(SPREADSHEET_ID, updateRange, formattedValues);
 
@@ -135,10 +137,13 @@ export async function PUT(request: Request) {
   }
 }
 
-function formatValues(values: any, id: number | string, isGrocery: boolean) {
+function formatValues(values: any, id: string | number, isGrocery: boolean) {
+  // Ensure id remains as a string
+  const idString = id.toString();
+  
   if (isGrocery) {
     return [
-      id.toString(),
+      idString,  // Keep the original ID
       values.date || '',
       values.name || '',
       values.price?.toString() || '0',
@@ -149,13 +154,14 @@ function formatValues(values: any, id: number | string, isGrocery: boolean) {
       values.durationUnit || '',
       values.quantity?.toString() || '',
       values.subCategory || '',
+      values.unit || '',
       values.sellerRate?.toString() || '',
-      values.sellerRate ? (parseFloat(values.sellerRate) * 2.20462).toFixed(2) : '',
+      values.sellerRateInLb?.toString() || '',
       'Yes' // Is Grocery
     ];
   } else {
     return [
-      id.toString(),
+      idString,  // Keep the original ID
       values.date || '',
       values.name || '',
       values.category || '',

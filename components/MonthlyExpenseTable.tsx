@@ -6,8 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Pencil, Check, X } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"
+import { Pencil, Plus } from "lucide-react"
+import { ExpenseModal } from "./ExpenseModal"
 
 type Expense = {
   id: string;
@@ -32,8 +32,10 @@ export function MonthlyExpenseTable() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editedExpense, setEditedExpense] = useState<Expense | null>(null);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [isGroceryModalOpen, setIsGroceryModalOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     fetchExpenses();
@@ -41,14 +43,11 @@ export function MonthlyExpenseTable() {
 
   async function fetchExpenses() {
     try {
-      console.log(`Fetching expenses for month: ${selectedMonth}, year: ${selectedYear}`);
       const response = await fetch(`/api/expenses?month=${selectedMonth}&year=${selectedYear}`);
       if (!response.ok) {
         throw new Error('Failed to fetch expenses');
       }
       const data = await response.json();
-      console.log('Fetched expenses:', data);
-      // Sort expenses by date
       const sortedExpenses = data.sort((a: Expense, b: Expense) => 
         new Date(a.date).getTime() - new Date(b.date).getTime()
       );
@@ -65,52 +64,37 @@ export function MonthlyExpenseTable() {
 
   const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
 
-  const handleEdit = (index: number) => {
-    setEditingIndex(index);
-    setEditedExpense({...expenses[index]});
-  };
-
-  const handleSave = async (index: number) => {
-    if (!editedExpense) return;
-    try {
-      const response = await fetch('/api/expenses', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          id: editedExpense.id,
-          values: {
-            ...editedExpense,
-            isGrocery: editedExpense.isGrocery
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update expense');
-      }
-
-      const updatedExpenses = [...expenses];
-      updatedExpenses[index] = editedExpense;
-      setExpenses(updatedExpenses);
-      setEditingIndex(null);
-      setEditedExpense(null);
-    } catch (error) {
-      console.error('Error updating expense:', error);
-    }
-  };
-
-  const handleCancel = () => {
-    setEditingIndex(null);
-    setEditedExpense(null);
+  const handleEdit = (expense: Expense) => {
+    setEditingExpense(expense);
+    setIsEditModalOpen(true);
   };
 
   return (
     <Card className="w-full overflow-hidden">
       <CardHeader>
-        <CardTitle className="text-xl sm:text-2xl">Monthly Expenses</CardTitle>
-        <CardDescription>View your expenses for a specific month and year</CardDescription>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="text-xl sm:text-2xl">Monthly Expenses</CardTitle>
+            <CardDescription>View your expenses for a specific month and year</CardDescription>
+          </div>
+          <div className="flex space-x-2">
+            <Button 
+              onClick={() => setIsGroceryModalOpen(true)}
+              className="flex items-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Grocery</span>
+            </Button>
+            <Button 
+              onClick={() => setIsExpenseModalOpen(true)}
+              className="flex items-center space-x-2"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Add Other</span>
+            </Button>
+          </div>
+        </div>
+        
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 mt-4">
           <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
             <SelectTrigger className="w-[180px]">
@@ -159,81 +143,66 @@ export function MonthlyExpenseTable() {
             </TableHeader>
             <TableBody>
               {expenses.length > 0 ? (
-                expenses.map((expense, index) => (
-                  <TableRow key={index}>
-                    {editingIndex === index && editedExpense ? (
-                      <>
-                        <TableCell><Input type="date" value={editedExpense.date} onChange={(e) => setEditedExpense({...editedExpense, date: e.target.value})} /></TableCell>
-                        <TableCell><Input value={editedExpense.name} onChange={(e) => setEditedExpense({...editedExpense, name: e.target.value})} /></TableCell>
-                        <TableCell><Input value={editedExpense.category} onChange={(e) => setEditedExpense({...editedExpense, category: e.target.value})} /></TableCell>
-                        <TableCell><Input type="number" value={editedExpense.price} onChange={(e) => setEditedExpense({...editedExpense, price: parseFloat(e.target.value)})} /></TableCell>
-                        <TableCell><Input value={editedExpense.store} onChange={(e) => setEditedExpense({...editedExpense, store: e.target.value})} /></TableCell>
-                        <TableCell><Input value={editedExpense.additionalDetails} onChange={(e) => setEditedExpense({...editedExpense, additionalDetails: e.target.value})} /></TableCell>
-                        <TableCell><Checkbox checked={editedExpense.isLongTermBuy} onCheckedChange={(checked) => setEditedExpense({...editedExpense, isLongTermBuy: checked as boolean})} /></TableCell>
-                        <TableCell><Input type="number" value={editedExpense.expectedDuration || ''} onChange={(e) => setEditedExpense({...editedExpense, expectedDuration: e.target.value ? parseInt(e.target.value) : null})} /></TableCell>
-                        <TableCell><Input value={editedExpense.durationUnit || ''} onChange={(e) => setEditedExpense({...editedExpense, durationUnit: e.target.value})} /></TableCell>
-                        <TableCell><Checkbox checked={editedExpense.isGrocery} onCheckedChange={(checked) => setEditedExpense({...editedExpense, isGrocery: checked as boolean})} /></TableCell>
-                        {editedExpense.isGrocery && (
-                          <>
-                            <TableCell><Input type="number" value={editedExpense.quantity || ''} onChange={(e) => setEditedExpense({...editedExpense, quantity: e.target.value ? parseFloat(e.target.value) : undefined})} /></TableCell>
-                            <TableCell><Input value={editedExpense.subCategory || ''} onChange={(e) => setEditedExpense({...editedExpense, subCategory: e.target.value})} /></TableCell>
-                            <TableCell>
-                              <Select value={editedExpense.unit} onValueChange={(value) => setEditedExpense({...editedExpense, unit: value})}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select unit" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="per kg/per lb">per kg/per lb</SelectItem>
-                                  <SelectItem value="each">each</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                            <TableCell><Input type="number" value={editedExpense.sellerRate || ''} onChange={(e) => setEditedExpense({...editedExpense, sellerRate: e.target.value ? parseFloat(e.target.value) : undefined})} /></TableCell>
-                            <TableCell><Input type="number" value={editedExpense.sellerRateInLb || ''} onChange={(e) => setEditedExpense({...editedExpense, sellerRateInLb: e.target.value ? parseFloat(e.target.value) : undefined})} /></TableCell>
-                          </>
-                        )}
-                        <TableCell>
-                          <Button onClick={() => handleSave(index)} className="mr-2"><Check className="h-4 w-4" /></Button>
-                          <Button onClick={handleCancel} variant="outline"><X className="h-4 w-4" /></Button>
-                        </TableCell>
-                      </>
-                    ) : (
-                      <>
-                        <TableCell>{expense.date}</TableCell>
-                        <TableCell>{expense.name}</TableCell>
-                        <TableCell>{expense.category}</TableCell>
-                        <TableCell>${(expense.price || 0).toFixed(2)}</TableCell>
-                        <TableCell>{expense.store}</TableCell>
-                        <TableCell>{expense.additionalDetails}</TableCell>
-                        <TableCell>{expense.isLongTermBuy ? 'Yes' : 'No'}</TableCell>
-                        <TableCell>{expense.expectedDuration}</TableCell>
-                        <TableCell>{expense.durationUnit}</TableCell>
-                        <TableCell>{expense.isGrocery ? 'Yes' : 'No'}</TableCell>
-                        {expense.isGrocery && (
-                          <>
-                            <TableCell>{expense.quantity}</TableCell>
-                            <TableCell>{expense.subCategory}</TableCell>
-                            <TableCell>{expense.unit}</TableCell>
-                            <TableCell>{expense.sellerRate}</TableCell>
-                            <TableCell>{expense.sellerRateInLb}</TableCell>
-                          </>
-                        )}
-                        <TableCell>
-                          <Button onClick={() => handleEdit(index)}><Pencil className="h-4 w-4" /></Button>
-                        </TableCell>
-                      </>
-                    )}
+                expenses.map((expense) => (
+                  <TableRow key={expense.id}>
+                    <TableCell>{expense.date}</TableCell>
+                    <TableCell>{expense.name}</TableCell>
+                    <TableCell>{expense.category}</TableCell>
+                    <TableCell>${(expense.price || 0).toFixed(2)}</TableCell>
+                    <TableCell>{expense.store}</TableCell>
+                    <TableCell>{expense.additionalDetails}</TableCell>
+                    <TableCell>{expense.isLongTermBuy ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>{expense.expectedDuration}</TableCell>
+                    <TableCell>{expense.durationUnit}</TableCell>
+                    <TableCell>{expense.isGrocery ? 'Yes' : 'No'}</TableCell>
+                    <TableCell>{expense.quantity}</TableCell>
+                    <TableCell>{expense.subCategory}</TableCell>
+                    <TableCell>{expense.unit}</TableCell>
+                    <TableCell>{expense.sellerRate}</TableCell>
+                    <TableCell>{expense.sellerRateInLb}</TableCell>
+                    <TableCell>
+                      <Button onClick={() => handleEdit(expense)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={17} className="text-center">No expenses found for this month and year.</TableCell>
+                  <TableCell colSpan={16} className="text-center">
+                    No expenses found for this month and year.
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </div>
       </CardContent>
+
+      {/* Add/Edit Modals */}
+      <ExpenseModal 
+        isOpen={isGroceryModalOpen}
+        onClose={() => setIsGroceryModalOpen(false)}
+        type="grocery"
+        mode="create"
+      />
+      <ExpenseModal 
+        isOpen={isExpenseModalOpen}
+        onClose={() => setIsExpenseModalOpen(false)}
+        type="other"
+        mode="create"
+      />
+      <ExpenseModal 
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingExpense(null);
+          fetchExpenses(); // Refresh the table after edit
+        }}
+        type={editingExpense?.isGrocery ? 'grocery' : 'other'}
+        editData={editingExpense}
+        mode="edit"
+      />
     </Card>
-  )
+  );
 }

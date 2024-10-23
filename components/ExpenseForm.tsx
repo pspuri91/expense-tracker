@@ -12,6 +12,12 @@ import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
+interface ExpenseFormProps {
+  onSuccess?: () => void;
+  editData?: any;
+  mode: 'create' | 'edit';
+}
+
 const formSchema = z.object({
   category: z.string({
     required_error: "Please select a category.",
@@ -26,7 +32,7 @@ const formSchema = z.object({
   durationUnit: z.enum(["days", "months", "years"]).optional(),
 })
 
-export function ExpenseForm() {
+export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFormProps) {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [categories, setCategories] = useState<string[]>([])
@@ -61,42 +67,65 @@ export function ExpenseForm() {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    if (mode === 'edit' && editData) {
+      form.reset({
+        category: editData.category,
+        date: editData.date,
+        name: editData.name,
+        price: editData.price,
+        store: editData.store || '',
+        additionalDetails: editData.additionalDetails || '',
+        isLongTermBuy: editData.isLongTermBuy,
+        expectedDuration: editData.expectedDuration,
+        durationUnit: editData.durationUnit,
+      });
+    }
+  }, [mode, editData, form]);
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true)
-    console.log("Submitting form with values:", values)
+    setIsSubmitting(true);
 
     try {
       const response = await fetch('/api/expenses', {
-        method: 'POST',
+        method: mode === 'create' ? 'POST' : 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ values: [values] }),
-      })
+        body: JSON.stringify(
+          mode === 'create' 
+            ? { values: [values] }
+            : { id: editData.id, values: values }
+        ),
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to add expense')
+        throw new Error(`Failed to ${mode} expense`);
       }
 
-      const result = await response.json()
-      console.log("Server response:", result)
-
+      const result = await response.json();
+      
       toast({
-        title: "Expense added successfully",
-        description: `Your new expense has been recorded with ID: ${result.id}`,
+        title: `Expense ${mode === 'create' ? 'added' : 'updated'} successfully`,
+        description: mode === 'create' 
+          ? `Your new expense has been recorded with ID: ${result.id}`
+          : 'Your expense has been updated',
         variant: "default",
-      })
+      });
 
-      form.reset()
+      onSuccess?.();
+      if (mode === 'create') {
+        form.reset();
+      }
     } catch (error) {
-      console.error("Error submitting expense:", error)
+      console.error(`Error ${mode}ing expense:`, error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 

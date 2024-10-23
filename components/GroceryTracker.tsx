@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
 
 const formSchema = z.object({
   date: z.string(),
@@ -24,9 +25,18 @@ const formSchema = z.object({
   unit: z.enum(["per kg/per lb", "each"]),
   sellerRate: z.number().positive("Seller rate must be positive."),
   sellerRateInLb: z.number().positive("Seller rate in lb must be positive."),
+  isLongTermBuy: z.boolean().default(false),
+  expectedDuration: z.number().optional(),
+  durationUnit: z.enum(["days", "months", "years"]).optional(),
 })
 
-export function GroceryTracker() {
+interface GroceryTrackerProps {
+  onSuccess?: () => void;
+  editData?: any;
+  mode: 'create' | 'edit';
+}
+
+export function GroceryTracker({ onSuccess, editData, mode = 'create' }: GroceryTrackerProps) {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -43,10 +53,13 @@ export function GroceryTracker() {
       unit: "per kg/per lb",
       sellerRate: 0,
       sellerRateInLb: 0,
+      isLongTermBuy: false,
+      expectedDuration: undefined,
+      durationUnit: undefined,
     },
   })
 
-  const handleUnitChange = (value: string) => {
+  const handleUnitChange = (value: "per kg/per lb" | "each") => {
     form.setValue('unit', value);
     form.setValue('sellerRate', 0);
     form.setValue('sellerRateInLb', 0);
@@ -66,42 +79,77 @@ export function GroceryTracker() {
     }
   };
 
+  // Add useEffect to populate form when editing
+  useEffect(() => {
+    if (mode === 'edit' && editData) {
+      form.reset({
+        date: editData.date,
+        name: editData.name,
+        price: editData.price,
+        store: editData.store,
+        additionalDetails: editData.additionalDetails,
+        quantity: editData.quantity,
+        subCategory: editData.subCategory,
+        unit: editData.unit,
+        sellerRate: editData.sellerRate,
+        sellerRateInLb: editData.sellerRateInLb,
+        isLongTermBuy: editData.isLongTermBuy,
+        expectedDuration: editData.expectedDuration,
+        durationUnit: editData.durationUnit,
+      });
+    }
+  }, [mode, editData, form]);
+
+  // Update onSubmit to handle both create and edit
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsSubmitting(true)
-    console.log("Submitting grocery item:", values)
+    setIsSubmitting(true);
+    
+    const submissionData = {
+      ...values,
+      isGrocery: true,
+      unit: values.unit
+    };
 
     try {
       const response = await fetch('/api/expenses', {
-        method: 'POST',
+        method: mode === 'create' ? 'POST' : 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ values: [{ ...values, isGrocery: true }] }),
-      })
+        body: JSON.stringify(
+          mode === 'create' 
+            ? { values: [submissionData] }
+            : { id: editData.id, values: submissionData }
+        ),
+      });
 
       if (!response.ok) {
-        throw new Error('Failed to add grocery item')
+        throw new Error(`Failed to ${mode} grocery item`);
       }
 
-      const result = await response.json()
-      console.log("Server response:", result)
-
+      const result = await response.json();
+      
       toast({
-        title: "Grocery item added successfully",
-        description: `Your new grocery item has been recorded with ID: ${result.id}`,
+        title: `Grocery item ${mode === 'create' ? 'added' : 'updated'} successfully`,
+        description: mode === 'create' 
+          ? `Your new grocery item has been recorded with ID: ${result.id}`
+          : 'Your grocery item has been updated',
         variant: "default",
-      })
+      });
 
-      form.reset()
+      onSuccess?.();
+      if (mode === 'create') {
+        form.reset();
+      }
     } catch (error) {
-      console.error("Error submitting grocery item:", error)
+      console.error(`Error ${mode}ing grocery item:`, error);
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive",
-      })
+      });
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
@@ -186,7 +234,13 @@ export function GroceryTracker() {
                     name="unit"
                     control={form.control}
                     render={({ field }) => (
-                      <Select onValueChange={handleUnitChange} value={field.value}>
+                      <Select 
+                        onValueChange={(value: "per kg/per lb" | "each") => {
+                          field.onChange(value); // Update the form field
+                          handleUnitChange(value); // Handle additional logic
+                        }} 
+                        value={field.value}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
@@ -229,6 +283,74 @@ export function GroceryTracker() {
               </div>
             </Card>
 
+            <FormField
+              control={form.control}
+              name="isLongTermBuy"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>
+                      Long Term Buy
+                    </FormLabel>
+                    <FormDescription>
+                      Check this if this is a long-term purchase
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {form.watch("isLongTermBuy") && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="expectedDuration"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expected Duration</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)} 
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="durationUnit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Duration Unit</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select unit" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="days">Days</SelectItem>
+                          <SelectItem value="months">Months</SelectItem>
+                          <SelectItem value="years">Years</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="additionalDetails">Additional Details (Optional)</Label>
               <Textarea
@@ -238,7 +360,7 @@ export function GroceryTracker() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Add Grocery Item"}
+              {isSubmitting ? "Submitting..." : mode === 'create' ? "Add Grocery Item" : "Update Grocery Item"}
             </Button>
           </form>
         </FormProvider>

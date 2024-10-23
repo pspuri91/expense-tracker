@@ -127,14 +127,10 @@ export async function updateGrocerySheetRow(spreadsheetId: string, range: string
   }
 }
 
-export async function getNextId(spreadsheetId: string, sheetName: string) {
-  const sheets = await getGoogleSheetsInstance();
-  const response = await sheets.spreadsheets.values.get({
-    spreadsheetId,
-    range: `${sheetName}!A:A`,
-  });
-  const values = response.data.values || [];
-  return values.length + 1; // Assuming the first row is headers
+export async function getNextId(spreadsheetId: string, sheet: 'Groceries' | 'Expenses'): Promise<string> {
+  const timestamp = Date.now();
+  const prefix = sheet === 'Groceries' ? 'G' : 'E';
+  return `${prefix}${timestamp}`;
 }
 
 // Add this function to the existing file

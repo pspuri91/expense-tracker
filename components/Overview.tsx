@@ -30,14 +30,23 @@ export function Overview() {
   const [yearlyData, setYearlyData] = useState<MonthlyData[]>([]);
   const [monthlyData, setMonthlyData] = useState<CategoryData[]>([]);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('default', { month: 'short' }));
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedMonthNumber, setSelectedMonthNumber] = useState<number | null>(null);
+  const [selectedMonthNumber, setSelectedMonthNumber] = useState(new Date().getMonth() + 1);
 
   useEffect(() => {
     fetchCategories();
     fetchYearlyData(selectedYear);
   }, [selectedYear]);
+
+  useEffect(() => {
+    if (yearlyData.length > 0) {
+      const currentMonthData = yearlyData.find(data => data.month === selectedMonth);
+      if (currentMonthData) {
+        handleMonthClick(currentMonthData);
+      }
+    }
+  }, [yearlyData, selectedMonth]); // Add selectedMonth to dependencies
 
   async function fetchCategories() {
     try {
@@ -105,46 +114,6 @@ export function Overview() {
     "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", 
     "#F06292", "#AED581", "#7986CB", "#4DB6AC", "#FFD54F"
   ];
-
-  const onPieEnter = (_: any, index: number) => {
-    setActiveIndex(index);
-  };
-
-  const renderActiveShape = (props: any) => {
-    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill, payload, percent, value } = props;
-  
-    return (
-      <g>
-        <text x={cx} y={cy} dy={8} textAnchor="middle" fill="#fff">
-          {payload.category}
-        </text>
-        <Sector
-          cx={cx}
-          cy={cy}
-          innerRadius={innerRadius}
-          outerRadius={outerRadius}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          fill={fill}
-        />
-        <Sector
-          cx={cx}
-          cy={cy}
-          startAngle={startAngle}
-          endAngle={endAngle}
-          innerRadius={outerRadius + 6}
-          outerRadius={outerRadius + 10}
-          fill={fill}
-        />
-        <text x={cx} y={cy - 20} textAnchor="middle" fill="#fff">
-          ${value.toFixed(2)}
-        </text>
-        <text x={cx} y={cy + 20} textAnchor="middle" fill="#fff">
-          {(percent * 100).toFixed(2)}%
-        </text>
-      </g>
-    );
-  };
 
   const renderYearlyChart = () => (
     <ResponsiveContainer width="100%" height={400}>
@@ -240,29 +209,25 @@ export function Overview() {
         </CardContent>
       </Card>
 
-      {selectedMonth && (
-        <Card className="bg-gradient-to-br from-gray-800 to-gray-700">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-white">{`${selectedMonth} ${selectedYear} Breakdown`}</CardTitle>
-            <CardDescription className="text-gray-300">Expenses by category for the selected month</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {renderMonthlyChart()}
-          </CardContent>
-        </Card>
-      )}
+      <Card className="bg-gradient-to-br from-gray-800 to-gray-700">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-white">{`${selectedMonth} ${selectedYear} Breakdown`}</CardTitle>
+          <CardDescription className="text-gray-300">Expenses by category for the selected month</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {renderMonthlyChart()}
+        </CardContent>
+      </Card>
 
-      {selectedMonthNumber && (
-        <Card className="bg-gradient-to-br from-gray-700 to-gray-600">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold text-white">Budget Overview</CardTitle>
-            <CardDescription className="text-gray-300">Budget status for {selectedMonth} {selectedYear}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <BudgetOverview selectedMonth={selectedMonthNumber} selectedYear={selectedYear} />
-          </CardContent>
-        </Card>
-      )}
+      <Card className="bg-gradient-to-br from-gray-700 to-gray-600">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-white">Budget Overview</CardTitle>
+          <CardDescription className="text-gray-300">Budget status for {selectedMonth} {selectedYear}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <BudgetOverview selectedMonth={selectedMonthNumber} selectedYear={selectedYear} />
+        </CardContent>
+      </Card>
     </div>
-  )
+  );
 }

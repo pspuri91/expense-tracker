@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Edit2, Check, X } from "lucide-react"
 import { motion } from "framer-motion"
 
@@ -12,16 +13,13 @@ type BudgetCategory = {
   budget: number;
 };
 
-interface BudgetOverviewProps {
-  selectedMonth: number;
-  selectedYear: number;
-}
-
-export function BudgetOverview({ selectedMonth, selectedYear }: BudgetOverviewProps) {
+export function BudgetOverview() {
   const [budgetData, setBudgetData] = useState<BudgetCategory[]>([]);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [editingCategory, setEditingCategory] = useState<string | null>(null);
   const [editedBudget, setEditedBudget] = useState<number>(0);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
   useEffect(() => {
     fetchBudgetData();
@@ -158,6 +156,29 @@ export function BudgetOverview({ selectedMonth, selectedYear }: BudgetOverviewPr
 
   return (
     <div className="space-y-2 bg-gray-100 dark:bg-gray-900 rounded-xl p-4">
+      <div className="flex space-x-4 mb-4">
+        <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Select year" />
+          </SelectTrigger>
+          <SelectContent>
+            {[...Array(5)].map((_, i) => {
+              const year = new Date().getFullYear() - i;
+              return <SelectItem key={year} value={year.toString()}>{year}</SelectItem>;
+            })}
+          </SelectContent>
+        </Select>
+        <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue placeholder="Select month" />
+          </SelectTrigger>
+          <SelectContent>
+            {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => (
+              <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
       {totalCategory && (
         <div className="mb-4">
           {renderBudgetCategory(totalCategory)}
