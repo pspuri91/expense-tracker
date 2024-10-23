@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server';
-import { readSpreadsheet, appendToSpreadsheet, updateSpreadsheetRow, getNextId } from '../../../lib/googleSheets';
+import { 
+  readSpreadsheet, 
+  appendToSpreadsheet, 
+  updateSpreadsheetRow, 
+  getNextId,
+  getGoogleSheetsInstance,
+  getSheetIds
+} from '../../../lib/googleSheets';
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 const EXPENSE_RANGE = 'Expenses!A:L';  // Extended to include Unit column
@@ -134,6 +141,80 @@ export async function PUT(request: Request) {
   } catch (error) {
     console.error('Failed to update expense:', error);
     return NextResponse.json({ error: 'Failed to update expense' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!SPREADSHEET_ID) {
+    return NextResponse.json({ error: 'Spreadsheet ID is not configured' }, { status: 500 });
+  }
+
+  try {
+    const { id, isGrocery } = await request.json();
+    const range = isGrocery ? GROCERY_RANGE : EXPENSE_RANGE;
+
+    // Find the row index for the given id
+    const data = await readSpreadsheet(SPREADSHEET_ID, range) || [];
+    
+    // Debug logs
+    console.log('Deleting expense with ID:', id);
+    console.log('Is Grocery:', isGrocery);
+    console.log('Data rows:', data.length);
+    
+    // Find exact match for ID
+    const rowIndex = data.findIndex((row: any[]) => {
+      console.log('Comparing row ID:', row[0], 'with expense ID:', id);
+      return row[0].toString() === id.toString();
+    });
+
+    console.log('Found row index:', rowIndex);
+
+    if (rowIndex === -1) {
+      return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+    }
+
+    // Get sheet IDs
+    const sheetIds = await getSheetIds(SPREADSHEET_ID);
+    const sheetId = isGrocery ? sheetIds['Groceries'] : sheetIds['Expenses'];
+
+    if (sheetId === undefined) {
+      throw new Error(`Sheet ID not found for ${isGrocery ? 'Groceries' : 'Expenses'}`);
+    }
+
+    // Delete the row from Google Sheets
+    const sheets = await getGoogleSheetsInstance();
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: {
+        requests: [{
+          deleteDimension: {
+            range: {
+              sheetId: sheetId,
+              dimension: 'ROWS',
+              startIndex: rowIndex, // Remove +1 as we want to include header
+              endIndex: rowIndex + 1 // Only delete one row
+            }
+          }
+        }]
+      }
+    });
+
+    return NextResponse.json({ 
+      message: 'Expense deleted successfully',
+      debug: {
+        id,
+        isGrocery,
+        rowIndex,
+        sheetId
+      }
+    });
+  } catch (error) {
+    console.error('Failed to delete expense:', error);
+    return NextResponse.json({ 
+      error: 'Failed to delete expense', 
+      details: error instanceof Error ? error.message : 'Unknown error',
+      debug: error
+    }, { status: 500 });
   }
 }
 

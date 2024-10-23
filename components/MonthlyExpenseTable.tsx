@@ -6,8 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Pencil, Plus } from "lucide-react"
+import { Pencil, Plus, Trash2 } from "lucide-react"
 import { ExpenseModal } from "./ExpenseModal"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { useToast } from "@/components/ui/use-toast"
 
 type Expense = {
   id: string;
@@ -36,6 +38,9 @@ export function MonthlyExpenseTable() {
   const [isGroceryModalOpen, setIsGroceryModalOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const { toast } = useToast()
 
   useEffect(() => {
     fetchExpenses();
@@ -67,6 +72,191 @@ export function MonthlyExpenseTable() {
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
     setIsEditModalOpen(true);
+  };
+
+  const handleDelete = async (expense: Expense) => {
+    setExpenseToDelete(expense);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!expenseToDelete) return;
+
+    try {
+      const response = await fetch('/api/expenses', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: expenseToDelete.id, isGrocery: expenseToDelete.isGrocery }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete expense');
+      }
+
+      // Refresh the expenses list
+      fetchExpenses();
+      setIsDeleteDialogOpen(false);
+      setExpenseToDelete(null);
+
+      toast({
+        title: "Expense deleted successfully",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete expense",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Update the sorting function
+  const sortByDateAndCategory = (a: Expense, b: Expense) => {
+    // Get category values with fallbacks
+    const categoryA = a.isGrocery 
+      ? (a.subCategory || 'Uncategorized')
+      : (a.category || 'Uncategorized');
+    
+    const categoryB = b.isGrocery 
+      ? (b.subCategory || 'Uncategorized')
+      : (b.category || 'Uncategorized');
+
+    // First sort by category
+    const categoryCompare = categoryA.localeCompare(categoryB);
+    
+    // If categories are the same, sort by date (descending)
+    if (categoryCompare === 0) {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    }
+    return categoryCompare;
+  };
+
+  // Update the getSortedAndGroupedExpenses function
+  const getSortedAndGroupedExpenses = () => {
+    // First, separate groceries and other expenses
+    const groceries = expenses.filter(expense => expense.isGrocery);
+    const otherExpenses = expenses.filter(expense => !expense.isGrocery);
+
+    // Sort each group
+    const sortedGroceries = [...groceries].sort(sortByDateAndCategory);
+    const sortedOtherExpenses = [...otherExpenses].sort(sortByDateAndCategory);
+
+    return { groceries: sortedGroceries, otherExpenses: sortedOtherExpenses };
+  };
+
+  // Update the table content section
+  const renderTableContent = () => {
+    if (expenses.length === 0) {
+      return (
+        <TableRow>
+          <TableCell colSpan={16} className="text-center">
+            No expenses found for this month and year.
+          </TableCell>
+        </TableRow>
+      );
+    }
+
+    const { groceries, otherExpenses } = getSortedAndGroupedExpenses();
+
+    return (
+      <>
+        {/* Groceries Section */}
+        {groceries.length > 0 && (
+          <>
+            <TableRow>
+              <TableCell 
+                colSpan={16} 
+                className="bg-gray-100 dark:bg-gray-800 font-semibold"
+              >
+                Grocery Expenses
+              </TableCell>
+            </TableRow>
+            {groceries.map((expense) => (
+              <TableRow key={expense.id}>
+                <TableCell>{expense.date}</TableCell>
+                <TableCell>{expense.name}</TableCell>
+                <TableCell>{expense.subCategory}</TableCell>
+                <TableCell>${(expense.price || 0).toFixed(2)}</TableCell>
+                <TableCell>{expense.store}</TableCell>
+                <TableCell>{expense.additionalDetails}</TableCell>
+                <TableCell>{expense.isLongTermBuy ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{expense.expectedDuration}</TableCell>
+                <TableCell>{expense.durationUnit}</TableCell>
+                <TableCell>{expense.isGrocery ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{expense.quantity}</TableCell>
+                <TableCell>{expense.subCategory}</TableCell>
+                <TableCell>{expense.unit}</TableCell>
+                <TableCell>{expense.sellerRate}</TableCell>
+                <TableCell>{expense.sellerRateInLb}</TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button onClick={() => handleEdit(expense)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      onClick={() => handleDelete(expense)}
+                      variant="destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </>
+        )}
+
+        {/* Other Expenses Section */}
+        {otherExpenses.length > 0 && (
+          <>
+            <TableRow>
+              <TableCell 
+                colSpan={16} 
+                className="bg-gray-100 dark:bg-gray-800 font-semibold"
+              >
+                Other Expenses
+              </TableCell>
+            </TableRow>
+            {otherExpenses.map((expense) => (
+              <TableRow key={expense.id}>
+                <TableCell>{expense.date}</TableCell>
+                <TableCell>{expense.name}</TableCell>
+                <TableCell>{expense.category}</TableCell>
+                <TableCell>${(expense.price || 0).toFixed(2)}</TableCell>
+                <TableCell>{expense.store}</TableCell>
+                <TableCell>{expense.additionalDetails}</TableCell>
+                <TableCell>{expense.isLongTermBuy ? 'Yes' : 'No'}</TableCell>
+                <TableCell>{expense.expectedDuration}</TableCell>
+                <TableCell>{expense.durationUnit}</TableCell>
+                <TableCell>{expense.isGrocery ? 'Yes' : 'No'}</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell>-</TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button onClick={() => handleEdit(expense)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      onClick={() => handleDelete(expense)}
+                      variant="destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </>
+        )}
+      </>
+    );
   };
 
   return (
@@ -142,38 +332,7 @@ export function MonthlyExpenseTable() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {expenses.length > 0 ? (
-                expenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>{expense.date}</TableCell>
-                    <TableCell>{expense.name}</TableCell>
-                    <TableCell>{expense.category}</TableCell>
-                    <TableCell>${(expense.price || 0).toFixed(2)}</TableCell>
-                    <TableCell>{expense.store}</TableCell>
-                    <TableCell>{expense.additionalDetails}</TableCell>
-                    <TableCell>{expense.isLongTermBuy ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>{expense.expectedDuration}</TableCell>
-                    <TableCell>{expense.durationUnit}</TableCell>
-                    <TableCell>{expense.isGrocery ? 'Yes' : 'No'}</TableCell>
-                    <TableCell>{expense.quantity}</TableCell>
-                    <TableCell>{expense.subCategory}</TableCell>
-                    <TableCell>{expense.unit}</TableCell>
-                    <TableCell>{expense.sellerRate}</TableCell>
-                    <TableCell>{expense.sellerRateInLb}</TableCell>
-                    <TableCell>
-                      <Button onClick={() => handleEdit(expense)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={16} className="text-center">
-                    No expenses found for this month and year.
-                  </TableCell>
-                </TableRow>
-              )}
+              {renderTableContent()}
             </TableBody>
           </Table>
         </div>
@@ -203,6 +362,24 @@ export function MonthlyExpenseTable() {
         editData={editingExpense}
         mode="edit"
       />
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the expense.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setExpenseToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

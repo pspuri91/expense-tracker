@@ -163,3 +163,19 @@ export async function updateCategoryBudget(spreadsheetId: string, category: stri
     requestBody: { values: [[budget]] },
   });
 }
+
+export async function getSheetIds(spreadsheetId: string) {
+  const sheets = await getGoogleSheetsInstance();
+  const response = await sheets.spreadsheets.get({
+    spreadsheetId,
+  });
+  
+  const sheetIds: { [key: string]: number } = {};
+  response.data.sheets?.forEach((sheet) => {
+    if (sheet.properties?.title && sheet.properties?.sheetId !== undefined) {
+      sheetIds[sheet.properties.title] = sheet.properties.sheetId;
+    }
+  });
+  
+  return sheetIds;
+}

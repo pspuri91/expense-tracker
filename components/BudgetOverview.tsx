@@ -4,13 +4,37 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Edit2, Check, X } from "lucide-react"
+import { Edit2, Check, X, Pencil, Trash2 } from "lucide-react"
 import { motion } from "framer-motion"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ExpenseModal } from "./ExpenseModal"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { toast } from "@/components/ui/use-toast"
 
 type BudgetCategory = {
   category: string;
   total: number;
   budget: number;
+};
+
+type Expense = {
+  id: string;
+  date: string;
+  name: string;
+  category: string;
+  price: number;
+  store: string;
+  additionalDetails: string;
+  isLongTermBuy: boolean;
+  expectedDuration: number | null;
+  durationUnit: string | null;
+  isGrocery: boolean;
+  quantity?: number;
+  subCategory?: string;
+  unit?: string;
+  sellerRate?: number;
+  sellerRateInLb?: number;
 };
 
 export function BudgetOverview() {
@@ -20,6 +44,13 @@ export function BudgetOverview() {
   const [editedBudget, setEditedBudget] = useState<number>(0);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [filteredExpenses, setFilteredExpenses] = useState<Expense[]>([]);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
   useEffect(() => {
     fetchBudgetData();
@@ -32,7 +63,6 @@ export function BudgetOverview() {
         throw new Error('Failed to fetch budget data');
       }
       const data = await response.json();
-      console.log('Fetched budget data:', data);
       setBudgetData(data.budgetData);
       setTotalExpenses(data.totalExpenses || 0);
     } catch (error) {
@@ -42,7 +72,7 @@ export function BudgetOverview() {
     }
   }
 
-  const handleEdit = (category: string, budget: number) => {
+  const handleBudgetEdit = (category: string, budget: number) => {
     setEditingCategory(category);
     setEditedBudget(budget);
   };
@@ -68,6 +98,38 @@ export function BudgetOverview() {
     }
   };
 
+  const handleCategoryClick = async (category: string) => {
+    try {
+      const response = await fetch(`/api/expenses?month=${selectedMonth}&year=${selectedYear}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch expenses');
+      }
+      const allExpenses = await response.json();
+      
+      let filtered: Expense[];
+      if (category === 'Total') {
+        filtered = allExpenses;
+      } else if (category === 'Grocery') {
+        filtered = allExpenses.filter((expense: Expense) => expense.isGrocery);
+      } else {
+        filtered = allExpenses.filter((expense: Expense) => 
+          !expense.isGrocery && expense.category === category
+        );
+      }
+
+      // Sort by date in descending order
+      filtered.sort((a: Expense, b: Expense) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      setFilteredExpenses(filtered);
+      setSelectedCategory(category);
+      setIsExpenseModalOpen(true);
+    } catch (error) {
+      console.error('Error fetching expenses:', error);
+    }
+  };
+
   const getColorForPercentage = (percentage: number) => {
     if (percentage < 50) return "from-emerald-500/20 to-emerald-500/40";
     if (percentage < 75) return "from-amber-500/20 to-amber-500/40";
@@ -82,47 +144,186 @@ export function BudgetOverview() {
     return "text-red-700 dark:text-red-300";
   };
 
-  const getGradientForPercentage = (percentage: number) => {
-    if (percentage < 50) return "bg-gradient-to-r from-emerald-500/20 to-emerald-500/40";
-    if (percentage < 75) return "bg-gradient-to-r from-amber-500/20 to-amber-500/40";
-    if (percentage < 100) return "bg-gradient-to-r from-orange-500/20 to-orange-500/40";
-    return "bg-gradient-to-r from-red-500/20 to-red-500/40";
+  const handleExpenseEdit = (expense: Expense) => {
+    setEditingExpense(expense);
+    setIsEditModalOpen(true);
   };
 
-  const renderBudgetCategory = (category: BudgetCategory) => {
-    const percentage = (category.total / category.budget) * 100;
-    const gradientClass = getGradientForPercentage(percentage);
-    const textColorClass = getTextColorForPercentage(percentage);
+  const handleDelete = async (expense: Expense) => {
+    setExpenseToDelete(expense);
+    setIsDeleteDialogOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!expenseToDelete) return;
+
+    try {
+      const response = await fetch('/api/expenses', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: expenseToDelete.id, isGrocery: expenseToDelete.isGrocery }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete expense');
+      }
+
+      // Refresh the expenses list
+      handleCategoryClick(selectedCategory!);
+      setIsDeleteDialogOpen(false);
+      setExpenseToDelete(null);
+
+      toast({
+        title: "Expense deleted successfully",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete expense",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const renderExpenseTable = () => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Date</TableHead>
+          <TableHead>Name</TableHead>
+          <TableHead>Price</TableHead>
+          <TableHead>Store</TableHead>
+          {selectedCategory === 'Grocery' && (
+            <>
+              <TableHead>Sub-category</TableHead>
+              <TableHead>Quantity</TableHead>
+              <TableHead>Unit</TableHead>
+            </>
+          )}
+          <TableHead>Additional Details</TableHead>
+          <TableHead>Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {filteredExpenses.map((expense) => (
+          <TableRow key={expense.id}>
+            <TableCell>{expense.date}</TableCell>
+            <TableCell>{expense.name}</TableCell>
+            <TableCell>${expense.price.toFixed(2)}</TableCell>
+            <TableCell>{expense.store}</TableCell>
+            {selectedCategory === 'Grocery' && (
+              <>
+                <TableCell>{expense.subCategory}</TableCell>
+                <TableCell>{expense.quantity}</TableCell>
+                <TableCell>{expense.unit}</TableCell>
+              </>
+            )}
+            <TableCell>{expense.additionalDetails}</TableCell>
+            <TableCell>
+              <div className="flex space-x-2">
+                <Button 
+                  onClick={() => handleExpenseEdit(expense)} 
+                  size="sm" 
+                  variant="outline"
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button 
+                  onClick={() => handleDelete(expense)} 
+                  size="sm" 
+                  variant="destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+
+  const renderBudgetWidgets = () => {
+    // Separate Total from other categories
+    const totalWidget = budgetData.find(cat => cat.category === 'Total');
+    const otherWidgets = budgetData
+      .filter(cat => cat.category !== 'Total')
+      // Sort by percentage in descending order
+      .sort((a, b) => {
+        const percentageA = (a.total / a.budget) * 100;
+        const percentageB = (b.total / b.budget) * 100;
+        return percentageB - percentageA;
+      });
+
+    return (
+      <div className="space-y-4">
+        {/* Total Widget - Full Width */}
+        {totalWidget && (
+          <div className="w-full">
+            {renderBudgetWidget(totalWidget)}
+          </div>
+        )}
+
+        {/* Other Category Widgets - Grid Layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {otherWidgets.map(category => renderBudgetWidget(category))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderBudgetWidget = (category: BudgetCategory) => {
+    const percentage = (category.total / category.budget) * 100;
+    const gradientClass = getColorForPercentage(percentage);
+    const textColorClass = getTextColorForPercentage(percentage);
+    
     return (
       <motion.div
         key={category.category}
-        className="mb-2 rounded-lg p-2 relative overflow-hidden"
+        className="rounded-lg p-4 relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow"
+        onClick={() => handleCategoryClick(category.category)}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
       >
+        {/* Gradient Background */}
         <div 
-          className={`absolute inset-0 ${gradientClass}`} 
-          style={{ width: `${Math.min(percentage, 100)}%` }}
+          className={`absolute inset-0 bg-gradient-to-r ${gradientClass}`} 
+          style={{ 
+            width: `${Math.min(percentage, 100)}%`,
+            transition: 'width 0.5s ease-in-out'
+          }}
         />
+        
+        {/* Content */}
         <div className="relative z-10">
           <div className="flex justify-between items-start">
             <div>
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-white">{category.category}</h3>
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
+                {category.category}
+              </h3>
               <p className={`text-xs ${textColorClass}`}>
                 ${category.total.toFixed(2)} / ${category.budget.toFixed(2)}
               </p>
             </div>
             <div className="flex flex-col items-end">
               <Button 
-                onClick={() => handleEdit(category.category, category.budget)} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleBudgetEdit(category.category, category.budget);
+                }} 
                 size="sm" 
                 className="h-6 w-6 p-0 bg-gray-700 hover:bg-gray-600 rounded-full mb-1"
               >
                 <Edit2 className="h-3 w-3 text-white" />
               </Button>
-              <p className={`text-sm font-bold ${textColorClass}`}>{percentage.toFixed(0)}%</p>
+              <p className={`text-sm font-bold ${textColorClass}`}>
+                {percentage.toFixed(0)}%
+              </p>
             </div>
           </div>
           <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
@@ -131,17 +332,32 @@ export function BudgetOverview() {
               : `$${(category.budget - category.total).toFixed(2)} left`}
           </p>
         </div>
+
+        {/* Edit Budget Overlay */}
         {editingCategory === category.category && (
           <div className="absolute inset-0 bg-gray-800 bg-opacity-90 flex items-center justify-center z-20">
-            <div className="flex items-center">
+            <div className="flex items-center" onClick={e => e.stopPropagation()}>
               <Input
                 type="number"
                 value={editedBudget}
                 onChange={(e) => setEditedBudget(Number(e.target.value))}
                 className="w-20 h-8 text-xs mr-2 bg-white dark:bg-gray-700"
               />
-              <Button onClick={handleSave} size="sm" className="h-8 px-2 mr-1 bg-green-500 hover:bg-green-600"><Check className="h-3 w-3" /></Button>
-              <Button onClick={() => setEditingCategory(null)} size="sm" className="h-8 px-2" variant="outline"><X className="h-3 w-3" /></Button>
+              <Button 
+                onClick={handleSave} 
+                size="sm" 
+                className="h-8 px-2 mr-1 bg-green-500 hover:bg-green-600"
+              >
+                <Check className="h-3 w-3" />
+              </Button>
+              <Button 
+                onClick={() => setEditingCategory(null)} 
+                size="sm" 
+                className="h-8 px-2" 
+                variant="outline"
+              >
+                <X className="h-3 w-3" />
+              </Button>
             </div>
           </div>
         )}
@@ -149,14 +365,9 @@ export function BudgetOverview() {
     );
   };
 
-  const totalCategory = budgetData.find(category => category.category === 'Total');
-  const sortedCategories = budgetData
-    .filter(category => category.category !== 'Total')
-    .sort((a, b) => (b.total / b.budget) - (a.total / a.budget));
-
   return (
-    <div className="space-y-2 bg-gray-100 dark:bg-gray-900 rounded-xl p-4">
-      <div className="flex space-x-4 mb-4">
+    <div className="space-y-4 bg-gray-100 dark:bg-gray-900 rounded-xl p-4">
+      <div className="flex space-x-4">
         <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
           <SelectTrigger className="w-[120px]">
             <SelectValue placeholder="Select year" />
@@ -179,14 +390,60 @@ export function BudgetOverview() {
           </SelectContent>
         </Select>
       </div>
-      {totalCategory && (
-        <div className="mb-4">
-          {renderBudgetCategory(totalCategory)}
-        </div>
-      )}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-        {sortedCategories.map(renderBudgetCategory)}
-      </div>
+      
+      {renderBudgetWidgets()}
+
+      {/* Expense List Modal */}
+      <Dialog open={isExpenseModalOpen} onOpenChange={setIsExpenseModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedCategory} Expenses - {months[selectedMonth - 1]} {selectedYear}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {renderExpenseTable()}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Modal */}
+      <ExpenseModal 
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setEditingExpense(null);
+          handleCategoryClick(selectedCategory!); // Refresh the list
+        }}
+        type={editingExpense?.isGrocery ? 'grocery' : 'other'}
+        editData={editingExpense}
+        mode="edit"
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the expense.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setExpenseToDelete(null)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-  )
+  );
 }
+
+const months = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
