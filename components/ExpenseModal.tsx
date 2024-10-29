@@ -13,6 +13,11 @@ interface ExpenseModalProps {
 }
 
 export function ExpenseModal({ isOpen, onClose, type, editData, mode }: ExpenseModalProps) {
+  const handleSuccess = () => {
+    onClose();
+    // You might want to add a callback here to refresh the expense list in the parent component
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -25,9 +30,9 @@ export function ExpenseModal({ isOpen, onClose, type, editData, mode }: ExpenseM
           </DialogTitle>
         </DialogHeader>
         {type === 'grocery' ? (
-          <GroceryTracker onSuccess={onClose} editData={editData} mode={mode} />
+          <GroceryTracker onSuccess={handleSuccess} editData={editData} mode={mode} />
         ) : (
-          <ExpenseForm onSuccess={onClose} editData={editData} mode={mode} />
+          <ExpenseForm onSuccess={handleSuccess} editData={editData} mode={mode} />
         )}
       </DialogContent>
     </Dialog>

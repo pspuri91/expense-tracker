@@ -42,6 +42,7 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [storeOptions, setStoreOptions] = useState<string[]>([])
   const [nameOptions, setNameOptions] = useState<string[]>([])
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -114,6 +115,11 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
         setStoreOptions(data);
       } catch (error) {
         console.error('Error fetching store names:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load store suggestions. You can still enter store names manually.",
+          variant: "destructive",
+        });
       }
     }
 
@@ -193,10 +199,25 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Add Grocery Item</CardTitle>
-        <CardDescription>Enter details for a new grocery item</CardDescription>
+        <CardTitle>{mode === 'create' ? 'Add Grocery Item' : 'Edit Grocery Item'}</CardTitle>
+        <CardDescription>Enter details for a grocery item</CardDescription>
       </CardHeader>
       <CardContent>
+        {fetchError && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+            {fetchError}
+          </div>
+        )}
+        {Object.keys(form.formState.errors).length > 0 && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+            <p className="font-semibold">Please fix the following errors:</p>
+            <ul className="list-disc list-inside">
+              {Object.entries(form.formState.errors).map(([field, error]) => (
+                <li key={field}>{error?.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -228,17 +249,20 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
                 <Input
                   id="price"
                   type="number"
-                  {...form.register('price', { valueAsNumber: true })}
-                  placeholder="0.00"
                   step="0.01"
+                  {...form.register('price', { 
+                    setValueAs: (value: string) => value === '' ? 0 : parseFloat(value)
+                  })}
+                  placeholder="0.00"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="quantity">Quantity</Label>
                 <Input
                   id="quantity"
-                  type="number"
-                  {...form.register('quantity', { valueAsNumber: true })}
+                  {...form.register('quantity', { 
+                    setValueAs: (value: string) => value === '' ? 0 : parseFloat(value)
+                  })}
                   placeholder="Enter quantity"
                 />
               </div>
@@ -305,30 +329,24 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="sellerRate">Seller Rate (per kg)</Label>
-                  <Controller
-                    name="sellerRate"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) => handleSellerRateChange(parseFloat(e.target.value))}
-                      />
-                    )}
+                  <Input
+                    type="number"
+                    step="0.01"
+                    {...form.register('sellerRate', { 
+                      setValueAs: (value: string) => value === '' ? 0 : parseFloat(value)
+                    })}
+                    onChange={(e) => handleSellerRateChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="sellerRateInLb">Seller Rate (per lb)</Label>
-                  <Controller
-                    name="sellerRateInLb"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Input
-                        type="number"
-                        {...field}
-                        onChange={(e) => handleSellerRateInLbChange(parseFloat(e.target.value))}
-                      />
-                    )}
+                  <Input
+                    type="number"
+                    step="0.01"
+                    {...form.register('sellerRateInLb', { 
+                      setValueAs: (value: string) => value === '' ? 0 : parseFloat(value)
+                    })}
+                    onChange={(e) => handleSellerRateInLbChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
                   />
                 </div>
               </div>

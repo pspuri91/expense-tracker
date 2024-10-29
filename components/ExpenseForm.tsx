@@ -39,20 +39,24 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
   const [categories, setCategories] = useState<string[]>([])
   const [storeOptions, setStoreOptions] = useState<string[]>([])
   const [nameOptions, setNameOptions] = useState<string[]>([])
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      category: "",
+      category: editData?.category || "", // Set initial value here
       date: new Date().toISOString().split('T')[0],
       name: "",
       price: 0,
       store: "",
       additionalDetails: "",
       isLongTermBuy: false,
+      expectedDuration: undefined,
+      durationUnit: undefined,
     },
   })
 
+  // Fetch categories first
   useEffect(() => {
     async function fetchCategories() {
       try {
@@ -61,30 +65,47 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
           throw new Error('Failed to fetch categories');
         }
         const data = await response.json();
-        setCategories(data.budgetData.map((item: any) => item.category).filter((category: string) => category !== 'Total'));
+        const categoryList = data.budgetData
+          .map((item: any) => item.category)
+          .filter((category: string) => category !== 'Total' && category !== 'Grocery');
+        setCategories(categoryList);
       } catch (error) {
-        console.error('Error fetching categories:', error);
+        setFetchError('Failed to load categories. Please refresh the page.');
+        toast({
+          title: "Error",
+          description: "Failed to load categories. Please refresh the page.",
+          variant: "destructive",
+        });
       }
     }
 
     fetchCategories();
-  }, []);
+  }, [toast]);
 
+  // Then set form values after categories are loaded
   useEffect(() => {
-    if (mode === 'edit' && editData) {
-      form.reset({
-        category: editData.category,
-        date: editData.date,
-        name: editData.name,
-        price: editData.price,
-        store: editData.store || '',
-        additionalDetails: editData.additionalDetails || '',
-        isLongTermBuy: editData.isLongTermBuy,
-        expectedDuration: editData.expectedDuration,
-        durationUnit: editData.durationUnit,
-      });
+    if (mode === 'edit' && editData && categories.length > 0) {
+      try {
+        form.reset({
+          category: editData.category,
+          date: editData.date,
+          name: editData.name,
+          price: editData.price,
+          store: editData.store || '',
+          additionalDetails: editData.additionalDetails || '',
+          isLongTermBuy: editData.isLongTermBuy,
+          expectedDuration: editData.expectedDuration || undefined,
+          durationUnit: editData.durationUnit || undefined,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to load expense data. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
-  }, [mode, editData, form]);
+  }, [mode, editData, categories, form, toast]);
 
   useEffect(() => {
     async function fetchStoreNames() {
@@ -132,7 +153,7 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
         body: JSON.stringify(
           mode === 'create' 
             ? { values: [values] }
-            : { id: editData.id, values: values }
+            : { id: editData.id, values: { ...values, isGrocery: false } }
         ),
       });
 
@@ -169,10 +190,15 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>Add Expense</CardTitle>
-        <CardDescription>Enter details for a new expense</CardDescription>
+        <CardTitle>{mode === 'create' ? 'Add Expense' : 'Edit Expense'}</CardTitle>
+        <CardDescription>{mode === 'create' ? 'Enter details for a new expense' : 'Update expense details'}</CardDescription>
       </CardHeader>
       <CardContent>
+        {fetchError && (
+          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+            {fetchError}
+          </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -182,7 +208,11 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                      value={field.value}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a category" />
@@ -190,10 +220,13 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                       </FormControl>
                       <SelectContent>
                         {categories.map((category) => (
-                          <SelectItem key={category} value={category}>{category}</SelectItem>
+                          <SelectItem key={category} value={category}>
+                            {category}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -232,8 +265,18 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                   <FormItem>
                     <FormLabel>Price ($)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} />
+                      <Input 
+                        type="number" 
+                        step="0.01" 
+                        {...field} 
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          field.onChange(value === '' ? 0 : parseFloat(value));
+                        }}
+                        value={field.value || ''} // Convert 0 to empty string for display
+                      />
                     </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -297,8 +340,17 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                     <FormItem>
                       <FormLabel>Expected Duration</FormLabel>
                       <FormControl>
-                        <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value))} />
+                        <Input 
+                          type="number" 
+                          {...field} 
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            field.onChange(value === '' ? undefined : parseInt(value));
+                          }}
+                          value={field.value || ''} // Convert undefined to empty string
+                        />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
@@ -308,7 +360,7 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Duration Unit</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select unit" />
@@ -325,9 +377,23 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
                 />
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Submitting..." : "Submit"}
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting || Object.keys(form.formState.errors).length > 0}
+            >
+              {isSubmitting ? "Submitting..." : mode === 'create' ? "Add Expense" : "Update Expense"}
             </Button>
+            {Object.keys(form.formState.errors).length > 0 && (
+              <div className="p-4 bg-red-100 text-red-700 rounded-md mt-4">
+                <p className="font-semibold">Please fix the following errors:</p>
+                <ul className="list-disc list-inside">
+                  {Object.entries(form.formState.errors).map(([field, error]) => (
+                    <li key={field}>{error?.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </form>
         </Form>
       </CardContent>

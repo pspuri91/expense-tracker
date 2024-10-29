@@ -3,8 +3,19 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, Cell, LabelList } from 'recharts'
+import { 
+  Bar, 
+  BarChart, 
+  ResponsiveContainer, 
+  XAxis, 
+  YAxis, 
+  Tooltip, 
+  Legend, 
+  Cell, 
+  LabelList
+} from 'recharts'
 import { BudgetOverview } from "@/components/BudgetOverview"
+import { useToast } from "@/components/ui/use-toast"
 
 type Expense = {
   id: string;
@@ -33,6 +44,12 @@ export function Overview() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('default', { month: 'short' }));
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedMonthNumber, setSelectedMonthNumber] = useState(new Date().getMonth() + 1);
+  const { toast } = useToast();
+
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
 
   useEffect(() => {
     fetchCategories();
@@ -46,7 +63,7 @@ export function Overview() {
         handleMonthClick(currentMonthData);
       }
     }
-  }, [yearlyData, selectedMonth]); // Add selectedMonth to dependencies
+  }, [yearlyData, selectedMonth]);
 
   async function fetchCategories() {
     try {
@@ -101,7 +118,7 @@ export function Overview() {
 
   function handleMonthClick(data: MonthlyData) {
     setSelectedMonth(data.month);
-    const monthNumber = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].indexOf(data.month) + 1;
+    const monthNumber = months.indexOf(data.month) + 1;
     setSelectedMonthNumber(monthNumber);
     const categoryData: CategoryData[] = categories.map(category => ({
       category,
@@ -141,19 +158,41 @@ export function Overview() {
   const renderMonthlyChart = () => (
     <ResponsiveContainer width="100%" height={400}>
       <BarChart data={monthlyData} layout="vertical">
-        <XAxis type="number" stroke="#fff" />
-        <YAxis dataKey="category" type="category" stroke="#fff" width={150} />
-        <Tooltip 
-          contentStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.8)', border: 'none', borderRadius: '4px' }}
-          labelStyle={{ color: '#fff' }}
-          formatter={(value: any) => (isNaN(value) ? '0' : value.toFixed(2))}
+        <XAxis 
+          type="number" 
+          stroke="#fff"
+          tick={{ fill: '#fff' }}
         />
-        <Legend wrapperStyle={{ color: '#fff' }} />
+        <YAxis 
+          dataKey="category" 
+          type="category" 
+          stroke="#fff"
+          width={150}
+          tick={{ fill: '#fff', fontSize: 12 }}
+        />
+        <Tooltip 
+          contentStyle={{ 
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            border: 'none',
+            borderRadius: '4px',
+            color: '#fff'
+          }}
+          formatter={(value: any) => (isNaN(value) ? '0' : `$${value.toFixed(2)}`)}
+        />
+        <Legend 
+          wrapperStyle={{ color: '#fff' }}
+          formatter={(value) => <span style={{ color: '#fff' }}>{value}</span>}
+        />
         <Bar dataKey="amount" fill="#8884d8">
           {monthlyData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={colorScale[index % colorScale.length]} />
           ))}
-          <LabelList dataKey="amount" position="right" content={renderCustomLabel} />
+          <LabelList 
+            dataKey="amount" 
+            position="right" 
+            content={renderCustomLabel}
+            fill="#fff"
+          />
         </Bar>
       </BarChart>
     </ResponsiveContainer>
@@ -163,7 +202,13 @@ export function Overview() {
     const { x, y, width, height, value } = props;
     if (isNaN(value) || value === 0) return null;
     return (
-      <text x={x + width + 5} y={y + height / 2} fill="#fff" textAnchor="start" dominantBaseline="middle">
+      <text 
+        x={x + width + 5} 
+        y={y + height / 2} 
+        fill="#fff"
+        textAnchor="start" 
+        dominantBaseline="middle"
+      >
         ${value.toFixed(2)}
       </text>
     );
@@ -188,46 +233,61 @@ export function Overview() {
 
   return (
     <div className="space-y-8">
-      <Card className="bg-gradient-to-br from-gray-900 to-gray-800">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-white">Yearly Overview</CardTitle>
-          <CardDescription className="text-gray-300">Total expenses by month for the selected year</CardDescription>
-          <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-            <SelectTrigger className="w-[180px] bg-gray-700 text-white border-gray-600">
-              <SelectValue placeholder="Select year" />
-            </SelectTrigger>
-            <SelectContent>
-              {[...Array(5)].map((_, i) => {
-                const year = new Date().getFullYear() - i;
-                return <SelectItem key={year} value={year.toString()}>{year}</SelectItem>;
-              })}
-            </SelectContent>
-          </Select>
-        </CardHeader>
-        <CardContent>
-          {renderYearlyChart()}
-        </CardContent>
-      </Card>
+      {/* Yearly Overview Chart */}
+      <div className="w-full">
+        <Card className="bg-gradient-to-br from-gray-900 to-gray-800">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-white">Yearly Overview</CardTitle>
+            <CardDescription className="text-gray-300">Total expenses by month for the selected year</CardDescription>
+            <Select value={selectedYear.toString()} onValueChange={(value) => {
+              const year = parseInt(value);
+              setSelectedYear(year);
+            }}>
+              <SelectTrigger className="w-[180px] bg-gray-700 text-white border-gray-600">
+                <SelectValue placeholder="Select year" />
+              </SelectTrigger>
+              <SelectContent>
+                {[...Array(5)].map((_, i) => {
+                  const year = new Date().getFullYear() - i;
+                  return <SelectItem key={year} value={year.toString()}>{year}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="h-[400px]">
+            {renderYearlyChart()}
+          </CardContent>
+        </Card>
+      </div>
 
-      <Card className="bg-gradient-to-br from-gray-800 to-gray-700">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-white">{`${selectedMonth} ${selectedYear} Breakdown`}</CardTitle>
-          <CardDescription className="text-gray-300">Expenses by category for the selected month</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {renderMonthlyChart()}
-        </CardContent>
-      </Card>
+      {/* Monthly Breakdown */}
+      <div className="w-full">
+        <Card className="bg-gradient-to-br from-gray-800 to-gray-700">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-white">{`${selectedMonth} ${selectedYear} Breakdown`}</CardTitle>
+            <CardDescription className="text-gray-300">Expenses by category for the selected month</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[400px]">
+            {renderMonthlyChart()}
+          </CardContent>
+        </Card>
+      </div>
 
-      <Card className="bg-gradient-to-br from-gray-700 to-gray-600">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-white">Budget Overview</CardTitle>
-          <CardDescription className="text-gray-300">Budget status for {selectedMonth} {selectedYear}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <BudgetOverview selectedMonth={selectedMonthNumber} selectedYear={selectedYear} />
-        </CardContent>
-      </Card>
+      {/* Budget Overview */}
+      <div className="w-full">
+        <Card className="bg-gradient-to-br from-gray-700 to-gray-600">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold text-white">Budget Overview</CardTitle>
+            <CardDescription className="text-gray-300">Budget status for {selectedMonth} {selectedYear}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BudgetOverview 
+              selectedMonth={selectedMonthNumber} 
+              selectedYear={selectedYear} 
+            />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

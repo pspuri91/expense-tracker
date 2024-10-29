@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ExpenseModal } from "./ExpenseModal"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { toast } from "@/components/ui/use-toast"
+import { Card } from "@/components/ui/card"
 
 type BudgetCategory = {
   category: string;
@@ -51,6 +52,7 @@ export function BudgetOverview() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBudgetData();
@@ -58,6 +60,7 @@ export function BudgetOverview() {
 
   async function fetchBudgetData() {
     try {
+      setError(null);
       const response = await fetch(`/api/budget?month=${selectedMonth}&year=${selectedYear}`);
       if (!response.ok) {
         throw new Error('Failed to fetch budget data');
@@ -67,6 +70,12 @@ export function BudgetOverview() {
       setTotalExpenses(data.totalExpenses || 0);
     } catch (error) {
       console.error('Error fetching budget data:', error);
+      setError('Failed to load budget data. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to load budget data. Please try again.",
+        variant: "destructive",
+      });
       setBudgetData([]);
       setTotalExpenses(0);
     }
@@ -93,8 +102,17 @@ export function BudgetOverview() {
 
       await fetchBudgetData();
       setEditingCategory(null);
+      toast({
+        title: "Success",
+        description: "Budget updated successfully",
+      });
     } catch (error) {
       console.error('Error updating budget:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update budget. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -145,7 +163,16 @@ export function BudgetOverview() {
   };
 
   const handleExpenseEdit = (expense: Expense) => {
-    setEditingExpense(expense);
+    setEditingExpense({
+      ...expense,
+      category: expense.category, // Ensure this line is present
+      isGrocery: expense.isGrocery || false,
+      subCategory: expense.subCategory || '',
+      quantity: expense.quantity || 0,
+      unit: expense.unit || '',
+      sellerRate: expense.sellerRate || 0,
+      sellerRateInLb: expense.sellerRateInLb || 0,
+    });
     setIsEditModalOpen(true);
   };
 
@@ -189,62 +216,125 @@ export function BudgetOverview() {
     }
   };
 
-  const renderExpenseTable = () => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Date</TableHead>
-          <TableHead>Name</TableHead>
-          <TableHead>Price</TableHead>
-          <TableHead>Store</TableHead>
-          {selectedCategory === 'Grocery' && (
-            <>
-              <TableHead>Sub-category</TableHead>
-              <TableHead>Quantity</TableHead>
-              <TableHead>Unit</TableHead>
-            </>
-          )}
-          <TableHead>Additional Details</TableHead>
-          <TableHead>Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredExpenses.map((expense) => (
-          <TableRow key={expense.id}>
-            <TableCell>{expense.date}</TableCell>
-            <TableCell>{expense.name}</TableCell>
-            <TableCell>${expense.price.toFixed(2)}</TableCell>
-            <TableCell>{expense.store}</TableCell>
-            {selectedCategory === 'Grocery' && (
-              <>
-                <TableCell>{expense.subCategory}</TableCell>
-                <TableCell>{expense.quantity}</TableCell>
-                <TableCell>{expense.unit}</TableCell>
-              </>
-            )}
-            <TableCell>{expense.additionalDetails}</TableCell>
-            <TableCell>
-              <div className="flex space-x-2">
-                <Button 
-                  onClick={() => handleExpenseEdit(expense)} 
-                  size="sm" 
-                  variant="outline"
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-                <Button 
-                  onClick={() => handleDelete(expense)} 
-                  size="sm" 
-                  variant="destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+  const renderExpenseCard = (expense: Expense) => (
+    <Card className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-4">
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <h3 className="font-semibold">{expense.name}</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{expense.date}</p>
+        </div>
+        <div className="text-right">
+          <p className="font-bold">${expense.price.toFixed(2)}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{expense.store}</p>
+        </div>
+      </div>
+      
+      {expense.isGrocery ? (
+        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+          <div>
+            <span className="text-gray-500 dark:text-gray-400">Sub-category:</span>
+            <p>{expense.subCategory}</p>
+          </div>
+          <div>
+            <span className="text-gray-500 dark:text-gray-400">Quantity:</span>
+            <p>{expense.quantity} {expense.unit}</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-2">
+          <span className="text-sm text-gray-500 dark:text-gray-400">Category:</span>
+          <p className="text-sm">{expense.category}</p>
+        </div>
+      )}
+
+      {expense.additionalDetails && (
+        <div className="text-sm mb-2">
+          <span className="text-gray-500 dark:text-gray-400">Details:</span>
+          <p>{expense.additionalDetails}</p>
+        </div>
+      )}
+
+      <div className="flex justify-end space-x-2 mt-2">
+        <Button onClick={() => handleExpenseEdit(expense)} size="sm">
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button 
+          onClick={() => handleDelete(expense)}
+          variant="destructive"
+          size="sm"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </Card>
+  );
+
+  const renderExpenseList = () => (
+    <div>
+      {/* Desktop view */}
+      <div className="hidden md:block overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Store</TableHead>
+              {selectedCategory === 'Grocery' && (
+                <>
+                  <TableHead>Sub-category</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Unit</TableHead>
+                </>
+              )}
+              <TableHead>Additional Details</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredExpenses.map((expense) => (
+              <TableRow key={expense.id}>
+                <TableCell>{expense.date}</TableCell>
+                <TableCell>{expense.name}</TableCell>
+                <TableCell>${expense.price.toFixed(2)}</TableCell>
+                <TableCell>{expense.store}</TableCell>
+                {selectedCategory === 'Grocery' && (
+                  <>
+                    <TableCell>{expense.subCategory}</TableCell>
+                    <TableCell>{expense.quantity}</TableCell>
+                    <TableCell>{expense.unit}</TableCell>
+                  </>
+                )}
+                <TableCell>{expense.additionalDetails}</TableCell>
+                <TableCell>
+                  <div className="flex space-x-2">
+                    <Button 
+                      onClick={() => handleExpenseEdit(expense)} 
+                      size="sm" 
+                      variant="outline"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      onClick={() => handleDelete(expense)} 
+                      size="sm" 
+                      variant="destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Mobile view */}
+      <div className="md:hidden">
+        {filteredExpenses.map((expense) => renderExpenseCard(expense))}
+      </div>
+    </div>
   );
 
   const renderBudgetWidgets = () => {
@@ -367,6 +457,11 @@ export function BudgetOverview() {
 
   return (
     <div className="space-y-4 bg-gray-100 dark:bg-gray-900 rounded-xl p-4">
+      {error && (
+        <div className="p-4 bg-red-100 text-red-700 rounded-md">
+          {error}
+        </div>
+      )}
       <div className="flex space-x-4">
         <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
           <SelectTrigger className="w-[120px]">
@@ -402,7 +497,7 @@ export function BudgetOverview() {
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4">
-            {renderExpenseTable()}
+            {renderExpenseList()}
           </div>
         </DialogContent>
       </Dialog>

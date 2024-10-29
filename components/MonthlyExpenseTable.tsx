@@ -33,7 +33,7 @@ type Expense = {
 
 export function MonthlyExpenseTable() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isGroceryModalOpen, setIsGroceryModalOpen] = useState(false);
@@ -44,6 +44,8 @@ export function MonthlyExpenseTable() {
   const [selectedExpenseName, setSelectedExpenseName] = useState<string | null>(null);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const { toast } = useToast()
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchExpenses();
@@ -51,23 +53,43 @@ export function MonthlyExpenseTable() {
 
   async function fetchExpenses() {
     try {
-      const response = await fetch(`/api/expenses?month=${selectedMonth}&year=${selectedYear}`);
+      setError(null);
+      const response = await fetch(
+        `/api/expenses?month=${selectedMonth === 'all' ? '' : selectedMonth}&year=${selectedYear}`
+      );
       if (!response.ok) {
         throw new Error('Failed to fetch expenses');
       }
       const data = await response.json();
       const sortedExpenses = data.sort((a: Expense, b: Expense) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
+        new Date(b.date).getTime() - new Date(a.date).getTime()
       );
       setExpenses(sortedExpenses);
     } catch (error) {
       console.error('Error fetching expenses:', error);
+      setError('Failed to load expenses. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to load expenses. Please try again.",
+        variant: "destructive",
+      });
     }
   }
 
   const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    { value: "all", label: "All" },  // Add "All" option
+    { value: "1", label: "January" },
+    { value: "2", label: "February" },
+    { value: "3", label: "March" },
+    { value: "4", label: "April" },
+    { value: "5", label: "May" },
+    { value: "6", label: "June" },
+    { value: "7", label: "July" },
+    { value: "8", label: "August" },
+    { value: "9", label: "September" },
+    { value: "10", label: "October" },
+    { value: "11", label: "November" },
+    { value: "12", label: "December" },
   ];
 
   const years = Array.from({length: 5}, (_, i) => new Date().getFullYear() - i);
@@ -229,9 +251,9 @@ export function MonthlyExpenseTable() {
     </div>
   );
 
-  // Update the renderTableContent function
+  // Update the renderTableContent function to use filteredExpenses
   const renderTableContent = () => {
-    if (expenses.length === 0) {
+    if (filteredExpenses.length === 0) {
       return (
         <div className="text-center p-4">
           No expenses found for this month and year.
@@ -239,26 +261,32 @@ export function MonthlyExpenseTable() {
       );
     }
 
-    const { groceries, otherExpenses } = getSortedAndGroupedExpenses();
+    // Get sorted and grouped expenses from filtered expenses
+    const groceries = filteredExpenses.filter(expense => expense.isGrocery);
+    const otherExpenses = filteredExpenses.filter(expense => !expense.isGrocery);
+
+    // Sort each group
+    const sortedGroceries = [...groceries].sort(sortByDateAndCategory);
+    const sortedOtherExpenses = [...otherExpenses].sort(sortByDateAndCategory);
 
     // Mobile view
     return (
       <div className="md:hidden">
-        {groceries.length > 0 && (
+        {sortedGroceries.length > 0 && (
           <div className="mb-6">
             <h2 className="text-lg font-semibold mb-3 px-4">Grocery Expenses</h2>
-            {groceries.map((expense) => (
-              <div key={expense.id}> {/* Add key prop here */}
+            {sortedGroceries.map((expense) => (
+              <div key={expense.id}>
                 {renderExpenseCard(expense)}
               </div>
             ))}
           </div>
         )}
-        {otherExpenses.length > 0 && (
+        {sortedOtherExpenses.length > 0 && (
           <div>
             <h2 className="text-lg font-semibold mb-3 px-4">Other Expenses</h2>
-            {otherExpenses.map((expense) => (
-              <div key={expense.id}> {/* Add key prop here */}
+            {sortedOtherExpenses.map((expense) => (
+              <div key={expense.id}>
                 {renderExpenseCard(expense)}
               </div>
             ))}
@@ -268,9 +296,9 @@ export function MonthlyExpenseTable() {
     );
   };
 
-  // Add this function to render desktop table content
+  // Update the renderDesktopTableContent function to use filteredExpenses
   const renderDesktopTableContent = () => {
-    if (expenses.length === 0) {
+    if (filteredExpenses.length === 0) {
       return (
         <TableRow>
           <TableCell colSpan={16} className="text-center">
@@ -280,12 +308,18 @@ export function MonthlyExpenseTable() {
       );
     }
 
-    const { groceries, otherExpenses } = getSortedAndGroupedExpenses();
+    // Get sorted and grouped expenses from filtered expenses
+    const groceries = filteredExpenses.filter(expense => expense.isGrocery);
+    const otherExpenses = filteredExpenses.filter(expense => !expense.isGrocery);
+
+    // Sort each group
+    const sortedGroceries = [...groceries].sort(sortByDateAndCategory);
+    const sortedOtherExpenses = [...otherExpenses].sort(sortByDateAndCategory);
 
     return (
       <>
         {/* Groceries Section */}
-        {groceries.length > 0 && (
+        {sortedGroceries.length > 0 && (
           <>
             <TableRow>
               <TableCell 
@@ -295,7 +329,7 @@ export function MonthlyExpenseTable() {
                 Grocery Expenses
               </TableCell>
             </TableRow>
-            {groceries.map((expense) => (
+            {sortedGroceries.map((expense) => (
               <TableRow key={expense.id}>
                 <TableCell>{expense.date}</TableCell>
                 <TableCell>
@@ -339,7 +373,7 @@ export function MonthlyExpenseTable() {
         )}
 
         {/* Other Expenses Section */}
-        {otherExpenses.length > 0 && (
+        {sortedOtherExpenses.length > 0 && (
           <>
             <TableRow>
               <TableCell 
@@ -349,7 +383,7 @@ export function MonthlyExpenseTable() {
                 Other Expenses
               </TableCell>
             </TableRow>
-            {otherExpenses.map((expense) => (
+            {sortedOtherExpenses.map((expense) => (
               <TableRow key={expense.id}>
                 <TableCell>{expense.date}</TableCell>
                 <TableCell>
@@ -400,8 +434,25 @@ export function MonthlyExpenseTable() {
     setIsHistoryModalOpen(true);
   };
 
+  // Add search filter function
+  const filteredExpenses = expenses.filter(expense => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      expense.name.toLowerCase().includes(searchLower) ||
+      expense.store?.toLowerCase().includes(searchLower) ||
+      expense.category?.toLowerCase().includes(searchLower) ||
+      expense.additionalDetails?.toLowerCase().includes(searchLower) ||
+      (expense.isGrocery && expense.subCategory?.toLowerCase().includes(searchLower))
+    );
+  });
+
   return (
     <Card className="w-full">
+      {error && (
+        <div className="p-4 bg-red-100 text-red-700 rounded-md m-4">
+          {error}
+        </div>
+      )}
       <CardHeader>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
@@ -426,37 +477,50 @@ export function MonthlyExpenseTable() {
           </div>
         </div>
         
-        <div className="flex flex-col sm:flex-row gap-2 mt-4">
-          <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Select month" />
-            </SelectTrigger>
-            <SelectContent>
-              {months.map((month, index) => (
-                <SelectItem key={index + 1} value={(index + 1).toString()}>{month}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-            <SelectTrigger className="w-full sm:w-[180px]">
-              <SelectValue placeholder="Select year" />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((year) => (
-                <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-col sm:flex-row gap-4 mt-4">
+          <div className="flex flex-col sm:flex-row gap-2 flex-1">
+            <Select 
+              value={selectedMonth.toString()} 
+              onValueChange={(value) => setSelectedMonth(value)}
+            >
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Select month" />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((month) => (
+                  <SelectItem key={month.value} value={month.value}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select 
+              value={selectedYear.toString()} 
+              onValueChange={(value) => setSelectedYear(parseInt(value))}
+            >
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Select year" />
+              </SelectTrigger>
+              <SelectContent>
+                {years.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Input
+              placeholder="Search expenses..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full sm:w-[300px]"
+            />
+          </div>
         </div>
       </CardHeader>
 
       <CardContent>
-        {/* Mobile View */}
-        <div className="block md:hidden">
-          {renderTableContent()}
-        </div>
-
-        {/* Desktop View */}
+        {/* Desktop view */}
         <div className="hidden md:block overflow-x-auto">
           <Table>
             <TableHeader>
@@ -483,6 +547,11 @@ export function MonthlyExpenseTable() {
               {renderDesktopTableContent()}
             </TableBody>
           </Table>
+        </div>
+
+        {/* Mobile view */}
+        <div className="md:hidden">
+          {renderTableContent()}
         </div>
       </CardContent>
 
