@@ -71,16 +71,18 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
   };
 
   const handleSellerRateChange = (value: number) => {
-    form.setValue('sellerRate', value);
+    const roundedValue = parseFloat(value.toFixed(2)); // Round to 2 decimal places
+    form.setValue('sellerRate', roundedValue);
     if (form.getValues('unit') === 'per kg/per lb') {
-      form.setValue('sellerRateInLb', value / 2.20462);
+      form.setValue('sellerRateInLb', parseFloat((roundedValue / 2.20462).toFixed(2))); // Round to 2 decimal places
     }
   };
 
   const handleSellerRateInLbChange = (value: number) => {
-    form.setValue('sellerRateInLb', value);
+    const roundedValue = parseFloat(value.toFixed(2)); // Round to 2 decimal places
+    form.setValue('sellerRateInLb', roundedValue);
     if (form.getValues('unit') === 'per kg/per lb') {
-      form.setValue('sellerRate', value * 2.20462);
+      form.setValue('sellerRate', parseFloat((roundedValue * 2.20462).toFixed(2))); // Round to 2 decimal places
     }
   };
 
