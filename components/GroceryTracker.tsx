@@ -24,7 +24,7 @@ const formSchema = z.object({
   additionalDetails: z.string().optional(),
   quantity: z.string().optional(),
   subCategory: z.enum(["Vegies", "Non-veg", "Dairy", "Fruits", "Long-Term", "Snacks"]).optional(),
-  unit: z.enum(["per kg/per lb", "each"]).optional(),
+  unit: z.enum(["each","per kg/per lb"]).optional(),
   sellerRate: z.number().positive("Seller rate must be positive.").optional(),
   sellerRateInLb: z.number().positive("Seller rate in lb must be positive.").optional(),
   isLongTermBuy: z.boolean().default(false).optional(),
@@ -51,13 +51,13 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
       date: new Date().toISOString().split('T')[0],
       name: "",
       price: undefined,
-      store: "",
+      store: "NoFrills",
       additionalDetails: "",
       quantity: "",
       subCategory: "Vegies",
-      unit: "per kg/per lb",
-      sellerRate: undefined,
-      sellerRateInLb: undefined,
+      unit: "each",
+      sellerRate: 1,
+      sellerRateInLb: 1,
       isLongTermBuy: false,
       expectedDuration: undefined,
       durationUnit: undefined,
@@ -356,7 +356,7 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
                     control={form.control}
                     render={({ field }) => (
                       <Select 
-                        onValueChange={(value: "per kg/per lb" | "each") => {
+                        onValueChange={(value: "each" | "per kg/per lb") => {
                           field.onChange(value); // Update the form field
                           handleUnitChange(value); // Handle additional logic
                         }} 
@@ -366,8 +366,8 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
                           <SelectValue placeholder="Select unit" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="per kg/per lb">per kg/per lb</SelectItem>
                           <SelectItem value="each">each</SelectItem>
+                          <SelectItem value="per kg/per lb">per kg/per lb</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
