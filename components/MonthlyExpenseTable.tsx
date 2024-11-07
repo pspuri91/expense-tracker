@@ -33,7 +33,7 @@ type Expense = {
 
 export function MonthlyExpenseTable() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()+1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isGroceryModalOpen, setIsGroceryModalOpen] = useState(false);

@@ -210,7 +210,7 @@ export function GroceryTab() {
       expense.subCategory?.toLowerCase().includes(searchLower) ||
       expense.additionalDetails?.toLowerCase().includes(searchLower)
     );
-  });
+  }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
