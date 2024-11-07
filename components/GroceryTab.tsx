@@ -54,6 +54,8 @@ export function GroceryTab() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
 
+  const [subCategoryData, setSubCategoryData] = useState<Record<string, number>>({});
+
   const months = [
     { value: "all", label: "All" },
     { value: "1", label: "January" },
@@ -75,6 +77,7 @@ export function GroceryTab() {
   useEffect(() => {
     fetchBudgetData();
     fetchExpenses();
+    fetchSubCategoryData();
   }, [selectedMonth, selectedYear]);
 
   async function fetchBudgetData() {
@@ -118,6 +121,24 @@ export function GroceryTab() {
     }
   }
 
+  async function fetchSubCategoryData() {
+    try {
+      const response = await fetch(`/api/grocery-subcategories?month=${selectedMonth}&year=${selectedYear}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch sub-category data');
+      }
+      const data = await response.json();
+      setSubCategoryData(data);
+    } catch (error) {
+      console.error('Error fetching sub-category data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load sub-category data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }
+
   const renderGroceryBudgetWidget = () => {
     const groceryData = budgetData.find(item => item.category === 'Grocery');
     if (!groceryData) return null;
@@ -128,7 +149,7 @@ export function GroceryTab() {
 
     return (
       <motion.div
-        className="rounded-lg p-4 relative overflow-hidden cursor-pointer hover:shadow-lg transition-shadow mb-6"
+        className="rounded-lg p-4 relative overflow-hidden cursor-pointer shadow-lg transition-shadow mb-6"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
@@ -369,6 +390,49 @@ export function GroceryTab() {
     );
   };
 
+  const renderSubCategoryWidgets = () => {
+    return Object.entries(subCategoryData).map(([subCategory, total]) => {
+      const percentage = (total / budgetData.find(cat => cat.category === 'Grocery')?.budget) * 100; // Assuming you have a budget for Grocery
+      const gradientClass = getColorForPercentage(percentage);
+      const textColorClass = getTextColorForPercentage(percentage);
+
+      return (
+        <motion.div
+          key={subCategory}
+          className="rounded-lg p-4 relative overflow-hidden cursor-pointer shadow-lg transition-shadow"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <div 
+            className={`absolute inset-0 bg-gradient-to-r ${gradientClass}`} 
+            style={{ 
+              width: `${Math.min(percentage, 100)}%`,
+              transition: 'width 0.5s ease-in-out'
+            }}
+          />
+          <div className="relative z-10">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
+                  {subCategory}
+                </h3>
+                <p className={`text-xs ${textColorClass}`}>
+                  ${total.toFixed(2)}
+                </p>
+              </div>
+              <div className="flex flex-col items-end">
+                <p className={`text-sm font-bold ${textColorClass}`}>
+                  {percentage.toFixed(0)}%
+                </p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      );
+    });
+  };
+
   return (
     <Card className="w-full">
       {error && (
@@ -396,7 +460,10 @@ export function GroceryTab() {
       <CardContent>
         {/* Budget Widget */}
         {renderGroceryBudgetWidget()}
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {renderSubCategoryWidgets()}
+        </div>
+        <div className="mb-6" /> 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
@@ -431,8 +498,11 @@ export function GroceryTab() {
           />
         </div>
 
+        
+
         {/* Expenses List */}
         {renderExpenseList()}
+
       </CardContent>
 
       {/* Add Grocery Modal */}

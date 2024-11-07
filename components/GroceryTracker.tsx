@@ -35,7 +35,7 @@ const formSchema = z.object({
 interface GroceryTrackerProps {
   onSuccess?: () => void;
   editData?: any;
-  mode: 'create' | 'edit';˚}
+  mode: 'create' | 'edit';}
 
 export function GroceryTracker({ onSuccess, editData, mode = 'create' }: GroceryTrackerProps) {
   const { toast } = useToast()
@@ -43,6 +43,7 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
   const [storeOptions, setStoreOptions] = useState<string[]>([])
   const [nameOptions, setNameOptions] = useState<string[]>([])
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [subCategoryOptions, setSubCategoryOptions] = useState<string[]>([]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -141,6 +142,28 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
     }
 
     fetchNames();
+  }, []);
+
+  useEffect(() => {
+    async function fetchSubCategories() {
+      try {
+        const response = await fetch('/api/subcategories'); // This should now point to the new API route
+        if (!response.ok) {
+          throw new Error('Failed to fetch sub-category names');
+        }
+        const data = await response.json();
+        setSubCategoryOptions(data);
+      } catch (error) {
+        console.error('Error fetching sub-category names:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load sub-category suggestions. You can still enter sub-categories manually.",
+          variant: "destructive",
+        });
+      }
+    }
+
+    fetchSubCategories();
   }, []);
 
   // Update onSubmit to handle both create and edit
@@ -290,19 +313,18 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
               </div>
               <div className="space-y-2">
                 <Label htmlFor="subCategory">Sub-Category</Label>
-                <Select onValueChange={(value) => form.setValue('subCategory', value as any)} defaultValue={form.getValues('subCategory')}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select sub-category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Vegies">Vegies</SelectItem>
-                    <SelectItem value="Non-veg">Non-veg</SelectItem>
-                    <SelectItem value="Dairy">Dairy</SelectItem>
-                    <SelectItem value="Fruits">Fruits</SelectItem>
-                    <SelectItem value="Long-Term">Long-Term</SelectItem>
-                    <SelectItem value="Snacks">Snacks</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="subCategory"
+                  control={form.control}
+                  defaultValue={editData?.subCategory || ''}
+                  render={({ field }) => (
+                    <Autocomplete
+                      {...field}
+                      options={subCategoryOptions}
+                      placeholder="Select or enter a sub-category"
+                    />
+                  )}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="store">Store</Label>
