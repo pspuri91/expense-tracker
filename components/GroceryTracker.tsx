@@ -65,9 +65,9 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
   })
 
   const handleUnitChange = (value: "per kg/per lb" | "each") => {
-    form.setValue('unit', value);
-    form.setValue('sellerRate', 0);
-    form.setValue('sellerRateInLb', 0);
+    form.setValue('unit', value ? value : "per kg/per lb");
+    //form.setValue('sellerRate', 0);
+    //form.setValue('sellerRateInLb', 0);
   };
 
   const handleSellerRateChange = (value: number) => {
@@ -89,20 +89,21 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
   // Add useEffect to populate form when editing
   useEffect(() => {
     if (mode === 'edit' && editData) {
+      console.log("editData", editData);
       form.reset({
         date: editData.date,
         name: editData.name,
         price: editData.price,
         store: editData.store,
         additionalDetails: editData.additionalDetails,
-        quantity: editData.quantity,
+        quantity: editData.quantity == null ? "" : editData.quantity,
         subCategory: editData.subCategory,
         unit: editData.unit,
         sellerRate: editData.sellerRate,
         sellerRateInLb: editData.sellerRateInLb,
         isLongTermBuy: editData.isLongTermBuy,
-        expectedDuration: editData.expectedDuration,
-        durationUnit: editData.durationUnit,
+        expectedDuration: editData.expectedDuration || undefined,
+        durationUnit: editData.durationUnit || undefined,
       });
     }
   }, [mode, editData, form]);
@@ -170,12 +171,13 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
 
   // Update onSubmit to handle both create and edit
   async function onSubmit(values: z.infer<typeof formSchema>) {
+    console.log("Submitting form with values:", values); // Log the values being submitted
     setIsSubmitting(true);
-    
+
     const submissionData = {
       ...values,
       isGrocery: true,
-      unit: values.unit
+      unit: values.unit,
     };
 
     try {
@@ -185,7 +187,7 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(
-          mode === 'create' 
+          mode === 'create'
             ? { values: [submissionData] }
             : { id: editData.id, values: submissionData }
         ),
@@ -196,10 +198,10 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
       }
 
       const result = await response.json();
-      
+
       toast({
         title: `Grocery item ${mode === 'create' ? 'added' : 'updated'} successfully`,
-        description: mode === 'create' 
+        description: mode === 'create'
           ? `Your new grocery item has been recorded with ID: ${result.id}`
           : 'Your grocery item has been updated',
         variant: "default",
