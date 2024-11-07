@@ -35,3 +35,7 @@ yarn-error.log*
 next-env.d.ts
 
 expense-tracker-*.json
+
+# SSL Certificates
+/certificates
+*.pem

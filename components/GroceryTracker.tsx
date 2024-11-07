@@ -14,19 +14,20 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Autocomplete } from "@/components/ui/autocomplete"; // Assume you have an Autocomplete component
+import { ReceiptScanner } from "@/components/ui/receipt-scanner"
 
 const formSchema = z.object({
   date: z.string(),
   name: z.string().min(2, "Name must be at least 2 characters."),
-  price: z.number().positive("Price must be positive."),
-  store: z.string().min(2, "Store name must be at least 2 characters."),
+  price: z.number().positive("Price must be positive.").optional(),
+  store: z.string().min(2, "Store name must be at least 2 characters.").optional(),
   additionalDetails: z.string().optional(),
-  quantity: z.number().positive("Quantity must be positive."),
-  subCategory: z.enum(["Vegies", "Non-veg", "Dairy", "Fruits", "Long-Term", "Snacks"]),
-  unit: z.enum(["per kg/per lb", "each"]),
-  sellerRate: z.number().positive("Seller rate must be positive."),
-  sellerRateInLb: z.number().positive("Seller rate in lb must be positive."),
-  isLongTermBuy: z.boolean().default(false),
+  quantity: z.string().optional(),
+  subCategory: z.enum(["Vegies", "Non-veg", "Dairy", "Fruits", "Long-Term", "Snacks"]).optional(),
+  unit: z.enum(["per kg/per lb", "each"]).optional(),
+  sellerRate: z.number().positive("Seller rate must be positive.").optional(),
+  sellerRateInLb: z.number().positive("Seller rate in lb must be positive.").optional(),
+  isLongTermBuy: z.boolean().default(false).optional(),
   expectedDuration: z.number().optional(),
   durationUnit: z.enum(["days", "months", "years"]).optional(),
 })
@@ -49,14 +50,14 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
       name: "",
-      price: 0,
+      price: undefined,
       store: "",
       additionalDetails: "",
-      quantity: 1,
+      quantity: "",
       subCategory: "Vegies",
       unit: "per kg/per lb",
-      sellerRate: 0,
-      sellerRateInLb: 0,
+      sellerRate: undefined,
+      sellerRateInLb: undefined,
       isLongTermBuy: false,
       expectedDuration: undefined,
       durationUnit: undefined,
@@ -196,11 +197,34 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
     }
   }
 
+  const handleScanComplete = (receiptData: any) => {
+    if (receiptData.date) {
+      form.setValue('date', receiptData.date);
+    }
+    if (receiptData.name) {
+      form.setValue('name', receiptData.name);
+    }
+    if (receiptData.price) {
+      form.setValue('price', receiptData.price);
+    }
+    if (receiptData.store) {
+      form.setValue('store', receiptData.store);
+    }
+    if (receiptData.category) {
+      form.setValue('subCategory', receiptData.category);
+    }
+  };
+
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>{mode === 'create' ? 'Add Grocery Item' : 'Edit Grocery Item'}</CardTitle>
-        <CardDescription>Enter details for a grocery item</CardDescription>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>{mode === 'create' ? 'Add Grocery Item' : 'Edit Grocery Item'}</CardTitle>
+            <CardDescription>Enter details for a grocery item</CardDescription>
+          </div>
+          <ReceiptScanner onScanComplete={handleScanComplete} type="grocery" />
+        </div>
       </CardHeader>
       <CardContent>
         {fetchError && (
@@ -260,10 +284,9 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
                 <Label htmlFor="quantity">Quantity</Label>
                 <Input
                   id="quantity"
-                  {...form.register('quantity', { 
-                    setValueAs: (value: string) => value === '' ? 0 : parseFloat(value)
-                  })}
-                  placeholder="Enter quantity"
+                  type="text"
+                  {...form.register('quantity')}
+                  placeholder="Enter quantity (e.g., 1 lb, 1kg, 1500gm)"
                 />
               </div>
               <div className="space-y-2">

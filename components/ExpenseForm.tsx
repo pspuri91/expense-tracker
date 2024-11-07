@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Autocomplete } from "@/components/ui/autocomplete"
+import { ReceiptScanner } from "@/components/ui/receipt-scanner"
 
 interface ExpenseFormProps {
   onSuccess?: () => void;
@@ -187,11 +188,31 @@ export function ExpenseForm({ onSuccess, editData, mode = 'create' }: ExpenseFor
     }
   }
 
+  const handleScanComplete = (receiptData: any) => {
+    if (receiptData.name) {
+      form.setValue('name', receiptData.name);
+    }
+    if (receiptData.date) {
+      form.setValue('date', receiptData.date);
+    }
+    if (receiptData.price) {
+      form.setValue('price', receiptData.price);
+    }
+    if (receiptData.store) {
+      form.setValue('store', receiptData.store);
+    }
+  };
+
   return (
     <Card className="w-full max-w-4xl mx-auto">
       <CardHeader>
-        <CardTitle>{mode === 'create' ? 'Add Expense' : 'Edit Expense'}</CardTitle>
-        <CardDescription>{mode === 'create' ? 'Enter details for a new expense' : 'Update expense details'}</CardDescription>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle>{mode === 'create' ? 'Add Expense' : 'Edit Expense'}</CardTitle>
+            <CardDescription>{mode === 'create' ? 'Enter details for a new expense' : 'Update expense details'}</CardDescription>
+          </div>
+          <ReceiptScanner onScanComplete={handleScanComplete} type="expense" />
+        </div>
       </CardHeader>
       <CardContent>
         {fetchError && (

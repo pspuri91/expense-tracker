@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readSpreadsheet } from '../../../lib/googleSheets';
+import { readSpreadsheet } from '../../../../lib/googleSheets';
 
 const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 const EXPENSE_RANGE = 'Expenses!A2:L';
