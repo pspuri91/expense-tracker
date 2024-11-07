@@ -237,7 +237,7 @@ export function GroceryTab() {
 
   // Add the renderExpenseCard function for mobile view
   const renderExpenseCard = (expense: Expense) => (
-    <Card className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-4">
+    <Card key={expense.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow mb-4">
       <div className="flex justify-between items-start mb-2">
         <div>
           <h3 className="font-semibold">{expense.name}</h3>
@@ -359,7 +359,11 @@ export function GroceryTab() {
 
         {/* Mobile view */}
         <div className="md:hidden">
-          {filteredExpenses.map((expense) => renderExpenseCard(expense))}
+          {filteredExpenses.map((expense) => (
+            <div key={expense.id}>
+              {renderExpenseCard(expense)}
+            </div>
+          ))}
         </div>
       </div>
     );

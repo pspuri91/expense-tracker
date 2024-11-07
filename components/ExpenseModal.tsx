@@ -1,6 +1,6 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { GroceryTracker } from "./GroceryTracker"
 import { ExpenseForm } from "./ExpenseForm"
 
@@ -28,6 +28,9 @@ export function ExpenseModal({ isOpen, onClose, type, editData, mode }: ExpenseM
               (type === 'grocery' ? 'Edit Grocery Expense' : 'Edit Other Expense')
             }
           </DialogTitle>
+          <DialogDescription>
+            {mode === 'create' ? 'Fill in the details to add a new expense.' : 'Update the details of the expense.'}
+          </DialogDescription>
         </DialogHeader>
         {type === 'grocery' ? (
           <GroceryTracker onSuccess={handleSuccess} editData={editData} mode={mode} />
