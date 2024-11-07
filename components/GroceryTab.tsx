@@ -80,6 +80,37 @@ export function GroceryTab() {
     fetchSubCategoryData();
   }, [selectedMonth, selectedYear]);
 
+  useEffect(() => {
+    const fetchLastExpenseData = async () => {
+      try {
+        const response = await fetch(`/api/expenses?month=${selectedMonth === 'all' ? '' : selectedMonth}&year=${selectedYear}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch expenses');
+        }
+        const data = await response.json();
+        const groceryExpenses = data.filter((expense: Expense) => expense.isGrocery);
+        setExpenses(groceryExpenses);
+
+        // Store the last expense date and last store name in session storage
+        if (groceryExpenses.length > 0) {
+          const lastExpense = groceryExpenses[groceryExpenses.length - 1];
+          sessionStorage.setItem('lastExpenseDate', lastExpense.date);
+          sessionStorage.setItem('lastStoreName', lastExpense.store); // Store the last store name
+        }
+      } catch (error) {
+        console.error('Error fetching expenses:', error);
+        setError('Failed to load expenses. Please try again.');
+        toast({
+          title: "Error",
+          description: "Failed to load expenses. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    fetchLastExpenseData();
+  }, [selectedMonth, selectedYear]);
+
   async function fetchBudgetData() {
     try {
       setError(null);

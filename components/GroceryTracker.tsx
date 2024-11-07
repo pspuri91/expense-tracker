@@ -48,10 +48,10 @@ export function GroceryTracker({ onSuccess, editData, mode = 'create' }: Grocery
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: new Date().toISOString().split('T')[0],
+      date: mode === 'create' ? sessionStorage.getItem('lastExpenseDate') || new Date().toISOString().split('T')[0] : editData?.date || new Date().toISOString().split('T')[0],
       name: "",
       price: undefined,
-      store: "NoFrills",
+      store: mode === 'create' ? sessionStorage.getItem('lastStoreName') || "NoFrills" : editData?.store || "NoFrills",
       additionalDetails: "",
       quantity: "",
       subCategory: "Vegies",
